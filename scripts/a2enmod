@@ -1,0 +1,160 @@
+#!/bin/sh
+# a2enmod — enable one or more Apache modules, with their prerequisites.
+#
+# # Why this exists here
+#
+# a2enmod is a Debian script that operates on Debian's layout: mods-available
+# holding a .load file per module, mods-enabled holding symlinks to them. The
+# official httpd image is Apache **compiled from source**, which has neither —
+# it has one httpd.conf carrying a commented `LoadModule` line per module.
+#
+# So the command everybody knows does not exist in this image, and the
+# alternative is telling people to sed a config file. This is that sed, with the
+# name they expect and the checks a one-liner does not have.
+#
+# # What it does that Debian's does not
+#
+# **It tests the configuration and rolls back.** Debian's a2enmod writes the
+# symlink and tells you to reload; if the module then refuses to load you find
+# out when Apache does not come back. This one runs `httpd -t` after the change
+# and restores the previous httpd.conf if it fails, so a bad enable leaves a
+# working server and a non-zero exit rather than a broken one.
+#
+# **It shows you Apache's actual complaint.** An earlier version of this script
+# ran `httpd -t 2>/dev/null` and then, after rolling back, ran `httpd -t` again
+# to show the result — which prints "Syntax OK", because by then the config is
+# fixed. The user got "does not pass httpd -t" immediately followed by "Syntax
+# OK" and no reason at all. The reason was being discarded one line earlier.
+#
+# **It resolves prerequisites.** See moddeps.sh — 16 modules in this image
+# either fail to load or come up silently broken when enabled alone, and Apache
+# reports that three different ways. `a2enmod proxy_balancer` on its own gives a
+# container that starts and then logs AH01177 on the first request.
+#
+# Enabling an already-enabled module is a no-op and exits 0 — it is meant to be
+# safe in a Dockerfile that may run twice.
+
+set -eu
+
+CONF="${HTTPD_CONF:-/usr/local/apache2/conf/httpd.conf}"
+MODDIR="${HTTPD_MODDIR:-/usr/local/apache2/modules}"
+. /usr/local/lib/apache-moddeps.sh
+
+if [ $# -eq 0 ]; then
+    echo "usage: a2enmod MODULE [MODULE...]" >&2
+    echo "       names are without the mod_ prefix and the .so suffix, e.g. 'a2enmod deflate'" >&2
+    echo "       prerequisites are enabled automatically; see 'a2enmod --list'" >&2
+    exit 2
+fi
+
+if [ "$1" = "--list" ]; then
+    for f in "$MODDIR"/mod_*.so; do
+        m="$(basename "$f" .so)"; m="${m#mod_}"
+        if grep -qE "^[[:space:]]*LoadModule[[:space:]]+${m}_module" "$CONF"; then
+            printf '%-24s enabled\n' "$m"
+        else
+            d="$(mod_deps "$m")"
+            [ -n "$d" ] && printf '%-24s disabled  (needs: %s)\n' "$m" "$d" \
+                        || printf '%-24s disabled\n' "$m"
+        fi
+    done
+    exit 0
+fi
+
+enabled() { grep -qE "^[[:space:]]*LoadModule[[:space:]]+${1}_module" "$CONF"; }
+
+# Turn the requested list into a list with prerequisites in front of the modules
+# that need them. One level of recursion covers this image: no prerequisite in
+# moddeps.sh has a prerequisite of its own that is not already in the same line.
+#
+# Each line is "module:requester", so the message can name the one module that
+# pulled a prerequisite in rather than the whole command line — "enabling
+# watchdog (required by md)" is a fact you can act on; "required by <everything
+# you typed>" is noise.
+expand() {
+    for m in "$@"; do
+        for d in $(mod_deps "$m"); do
+            for dd in $(mod_deps "$d"); do echo "$dd:$m"; done
+            echo "$d:$m"
+        done
+        echo "$m:"
+    done
+}
+
+wanted="$(expand "$@" | awk -F: '!seen[$1]++')"
+
+backup="$(mktemp)"
+cp "$CONF" "$backup"
+changed=0
+
+for entry in $wanted; do
+    name="${entry%%:*}"
+    requester="${entry#*:}"
+
+    # Accept mod_deflate, mod_deflate.so and deflate alike. People copy the
+    # filename out of the modules directory as often as they type the name.
+    mod="${name#mod_}"
+    mod="${mod%.so}"
+
+    if [ ! -f "$MODDIR/mod_${mod}.so" ]; then
+        echo "a2enmod: mod_${mod}.so is not in this image" >&2
+        echo "         see: a2enmod --list" >&2
+        rm -f "$backup"
+        exit 1
+    fi
+
+    if enabled "$mod"; then
+        echo "a2enmod: ${mod} is already enabled"
+        continue
+    fi
+
+    # Only one MPM may load. Refuse rather than guess: swapping the MPM out
+    # from under somebody because they asked for a different one is a bigger
+    # decision than this command should make on its own.
+    for c in $(mod_conflicts "$mod"); do
+        if enabled "$c"; then
+            echo "a2enmod: ${mod} conflicts with ${c}, which is enabled" >&2
+            echo "         only one MPM may be loaded; run 'a2dismod ${c}' first if you mean it" >&2
+            rm -f "$backup"
+            exit 1
+        fi
+    done
+
+    if grep -qE "^[[:space:]]*#[[:space:]]*LoadModule[[:space:]]+${mod}_module" "$CONF"; then
+        # The line upstream ships, uncommented in place — which keeps Apache's
+        # own load order rather than appending to the end of the file, where a
+        # module that must load before another would be too late.
+        sed -i "s|^[[:space:]]*#[[:space:]]*\(LoadModule[[:space:]][[:space:]]*${mod}_module\)|\1|" "$CONF"
+    else
+        # Shipped but with no line to uncomment: append one. Rare, and the
+        # reason the .so check above is separate from this — "not in the image"
+        # and "no line in httpd.conf" are different problems with different
+        # fixes.
+        printf 'LoadModule %s_module modules/mod_%s.so\n' "$mod" "$mod" >> "$CONF"
+    fi
+
+    if [ -n "$requester" ]; then
+        echo "a2enmod: enabling ${mod} (required by ${requester})"
+    else
+        echo "a2enmod: enabling ${mod}"
+    fi
+    changed=1
+done
+
+if [ "$changed" -eq 0 ]; then
+    rm -f "$backup"
+    exit 0
+fi
+
+# Capture the complaint before rolling back, because after the rollback the
+# configuration is valid again and httpd -t will happily say so.
+if ! why="$(httpd -t 2>&1)"; then
+    echo "a2enmod: the configuration does not pass httpd -t with that change; rolling back" >&2
+    echo "$why" | grep -v '^Syntax OK$' | sed 's/^/         /' >&2
+    cp "$backup" "$CONF"
+    rm -f "$backup"
+    exit 1
+fi
+
+rm -f "$backup"
+echo "a2enmod: done — restart Apache for it to take effect"

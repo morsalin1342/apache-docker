@@ -1,0 +1,99 @@
+#!/bin/sh
+# a2dismod — disable one or more Apache modules.
+#
+# # Why this exists here
+#
+# a2enmod is a Debian script that operates on Debian's layout: mods-available
+# holding a .load file per module, mods-enabled holding symlinks to them. The
+# official httpd image is Apache **compiled from source**, which has neither —
+# it has one httpd.conf carrying a commented `LoadModule` line per module.
+#
+# So the command everybody knows does not exist in this image, and the
+# alternative is telling people to sed a config file. This is that sed, with the
+# name they expect and the checks a one-liner does not have.
+#
+# # What it does that Debian's does not
+#
+# **It tests the configuration and rolls back.** Debian's a2enmod writes the
+# symlink and tells you to reload; if the module then refuses to load you find
+# out when Apache does not come back. This one runs `httpd -t` after the change
+# and restores the previous httpd.conf if it fails, so a bad enable leaves a
+# working server and a non-zero exit rather than a broken one.
+#
+# **It refuses to orphan a dependent.** `httpd -t` catches some of this on its
+# own — disabling `proxy` while `proxy_fcgi` is enabled is "Cannot load
+# modules/mod_proxy_fcgi.so", and the rollback saves you. But a whole class of
+# breakage passes the config test: disable `slotmem_shm` under a live
+# `proxy_balancer` and Apache starts perfectly, then logs AH01177 and balances
+# nothing. So the reverse of moddeps.sh is checked before the edit, not after.
+#
+# Disabling an already-disabled module is a no-op and exits 0.
+
+set -eu
+
+CONF="${HTTPD_CONF:-/usr/local/apache2/conf/httpd.conf}"
+MODDIR="${HTTPD_MODDIR:-/usr/local/apache2/modules}"
+. /usr/local/lib/apache-moddeps.sh
+
+if [ $# -eq 0 ]; then
+    echo "usage: a2dismod MODULE [MODULE...]" >&2
+    echo "       names are without the mod_ prefix and the .so suffix, e.g. 'a2dismod autoindex'" >&2
+    exit 2
+fi
+
+backup="$(mktemp)"
+cp "$CONF" "$backup"
+changed=0
+
+for name in "$@"; do
+    # Accept mod_deflate, mod_deflate.so and deflate alike. People copy the
+    # filename out of the modules directory as often as they type the name.
+    mod="${name#mod_}"
+    mod="${mod%.so}"
+
+    if ! grep -qE "^[[:space:]]*LoadModule[[:space:]]+${mod}_module" "$CONF"; then
+        echo "a2dismod: ${mod} is already disabled"
+        continue
+    fi
+
+    # Anything still enabled that needs this one? Checked before the edit
+    # because the failure it prevents is invisible to httpd -t.
+    orphans=""
+    for d in $(mod_dependents "$mod"); do
+        grep -qE "^[[:space:]]*LoadModule[[:space:]]+${d}_module" "$CONF" || continue
+        case " $* " in *" $d "*) continue ;; esac   # they asked for it too
+        orphans="$orphans $d"
+    done
+    if [ -n "$orphans" ]; then
+        echo "a2dismod: ${mod} is required by:$orphans" >&2
+        echo "          disable those too, or in the same command, if you mean it" >&2
+        cp "$backup" "$CONF"
+        rm -f "$backup"
+        exit 1
+    fi
+
+    # Commented rather than deleted, so a2enmod can put it back in place and
+    # Apache's own load order survives the round trip.
+    sed -i "s|^[[:space:]]*\(LoadModule[[:space:]][[:space:]]*${mod}_module\)|#\1|" "$CONF"
+
+    echo "a2dismod: disabling ${mod}"
+    changed=1
+done
+
+if [ "$changed" -eq 0 ]; then
+    rm -f "$backup"
+    exit 0
+fi
+
+# Capture the complaint before rolling back — afterwards the configuration is
+# valid again and httpd -t will say "Syntax OK", which is not what happened.
+if ! why="$(httpd -t 2>&1)"; then
+    echo "a2dismod: the configuration does not pass httpd -t with that change; rolling back" >&2
+    echo "$why" | grep -v '^Syntax OK$' | sed 's/^/          /' >&2
+    cp "$backup" "$CONF"
+    rm -f "$backup"
+    exit 1
+fi
+
+rm -f "$backup"
+echo "a2dismod: done — restart Apache for it to take effect"

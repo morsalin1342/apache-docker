@@ -1,0 +1,24 @@
+# Apache in front of php-fpm, both from these sibling images.
+#
+# The two containers mount the same directory at the same path — see the note in
+# conf/php-fpm.conf about why that is not optional.
+services:
+  php:
+    image: morsalin1342/php:8.4-fpm
+    volumes:
+      - ./src:/var/www/html
+
+  apache:
+    image: morsalin1342/apache:latest
+    depends_on:
+      - php
+    volumes:
+      - ./src:/var/www/html
+    # The whole of "make this a PHP application server".
+    #
+    # a2enconf appends the Include to httpd.conf and runs httpd -t, rolling the
+    # change back if it fails — so a broken fragment is a container that exits
+    # with a message rather than one that starts and serves 500s.
+    command: sh -c "a2enconf php-fpm && httpd-foreground"
+    ports:
+      - "8080:80"

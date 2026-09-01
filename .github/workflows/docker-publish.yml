@@ -1,0 +1,115 @@
+name: Docker Publish
+
+on:
+  push:
+    branches: [ "master" ]
+    paths:
+      - 'Dockerfile'
+      - 'conf/**'
+      # scripts/ is baked into the image — a2enmod and the shared dependency
+      # table ship in it, so a change here changes the artifact and must
+      # rebuild. Leaving it out is a silent no-op release.
+      - 'scripts/**'
+      - 'README.md'
+      - 'README.dockerhub.md'
+      - 'README.dockerhub-org.md'
+      - 'LICENSE'
+  workflow_dispatch:
+
+jobs:
+  build_and_publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Extract httpd version from Dockerfile
+        id: get_version
+        run: |
+          # The version lives in an ARG, not a FROM line: the image is
+          # `FROM httpd:${HTTPD_VERSION}`, so grepping FROM would return the
+          # literal placeholder rather than a version.
+          VERSION=$(grep -oP '^ARG HTTPD_VERSION=\K[0-9]+\.[0-9]+\.[0-9]+' Dockerfile | head -n 1)
+          if [ -z "$VERSION" ]; then
+            echo "Could not extract version from Dockerfile."
+            exit 1
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      # The main-server image: Apache facing clients. Default target, so the
+      # unsuffixed tags are the ones most people will pull.
+      - name: Build and push (main server)
+        id: build-and-push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: server
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_HUB_USERNAME }}/apache:${{ steps.get_version.outputs.version }}
+            ${{ secrets.DOCKER_HUB_USERNAME }}/apache:latest
+            ${{ secrets.DOCKER_HUB_ORG }}/apache:${{ steps.get_version.outputs.version }}
+            ${{ secrets.DOCKER_HUB_ORG }}/apache:latest
+          # Enable GHA caching for faster builds.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # The origin image: Apache behind a reverse proxy that terminates TLS.
+      #
+      # A second build rather than a second Dockerfile — `server` is built FROM
+      # `origin`, so every layer here is already in the cache from the step
+      # above and this costs one config edit and one startup check.
+      #
+      # There is deliberately no `-origin` floating alongside `latest`: the
+      # unsuffixed tags mean "main server", and someone typing `apache:latest`
+      # should get the image that works when Apache is the thing clients reach.
+      - name: Build and push (origin)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: origin
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_HUB_USERNAME }}/apache:${{ steps.get_version.outputs.version }}-origin
+            ${{ secrets.DOCKER_HUB_USERNAME }}/apache:origin
+            ${{ secrets.DOCKER_HUB_ORG }}/apache:${{ steps.get_version.outputs.version }}-origin
+            ${{ secrets.DOCKER_HUB_ORG }}/apache:origin
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  update_readme:
+    # This job runs only after build_and_publish has succeeded.
+    needs: build_and_publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Update Docker Hub description (personal repo)
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+          repository: ${{ secrets.DOCKER_HUB_USERNAME }}/apache
+          readme-filepath: ./README.dockerhub.md
+          short-description: 'Apache as a static server or php-fpm application server — no PHP inside'
+
+      - name: Update Docker Hub description (org repo)
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+          repository: ${{ secrets.DOCKER_HUB_ORG }}/apache
+          readme-filepath: ./README.dockerhub-org.md
+          short-description: 'Apache as a static server or php-fpm application server — no PHP inside'
