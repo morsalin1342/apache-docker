@@ -39,7 +39,7 @@ already carries, runs `httpd -t`, and rolls back if it fails.
 
 ```yaml
 image: morsalin1342/apache:2.4.68           # Apache faces clients
-image: morsalin1342/apache:2.4.68-origin    # nginx/Cloudflare/ALB faces clients
+image: morsalin1342/apache:2.4.68-origin    # a reverse proxy faces clients
 ```
 
 Neither needs modules added for the ordinary cases — static sites, PHP over FastCGI,

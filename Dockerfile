@@ -28,12 +28,11 @@
 #
 # # What is deliberately absent, and why
 #
-# **ModSecurity.** The nginx sibling ships it with the OWASP Core Rule Set, and
-# this one does not — deliberately. In the deployment these images are built
-# for, nginx is the *gateway*: it holds :80 and :443, terminates TLS and
-# reverse-proxies to this container. A WAF belongs where requests enter, and a
-# second one behind it inspects the same bytes a second time for the same
-# verdict. If you run this image as your edge, put a WAF in front of it.
+# **ModSecurity, or any WAF.** Deliberately absent. This image is built to sit
+# behind a gateway that holds :80 and :443, terminates TLS and reverse-proxies
+# to this container. A WAF belongs where requests enter, and a second one behind
+# it inspects the same bytes a second time for the same verdict. If you run this
+# image as your edge, put a WAF in front of it.
 #
 # **TLS, HTTP/2, HTTP/3, compression, rate limiting.** Same reason. mod_ssl,
 # mod_http2, mod_brotli and mod_deflate are all present in the image and all
@@ -110,10 +109,9 @@ ARG DEBIAN_RELEASE=trixie
 # this file changing. An image whose base distribution changed underneath a
 # published tag is a support question nobody can answer from the Dockerfile.
 #
-# The nginx sibling pins the same way and for the same reason. Alpine variants
-# exist and are not used here: the modules this image loads link against glibc
-# through Apache's own build, and matching the sibling images keeps one libc
-# across the stack.
+# Alpine variants exist and are not used here: the modules this image loads link
+# against glibc through Apache's own build, and staying on one libc across the
+# stack avoids a class of problem that only appears under load.
 FROM httpd:${HTTPD_VERSION}-${DEBIAN_RELEASE} AS origin
 
 ARG HTTPD_VERSION
@@ -188,10 +186,9 @@ RUN mkdir -p /var/www/html
 # The base configuration, included from httpd.conf — and the PHP one, which is
 # not.
 #
-# One include rather than editing httpd.conf further, for the reason the nginx
-# sibling gives about its own: somebody will mount their own configuration over
-# part of this image, and a single include line is one thing to restore rather
-# than a diff to reconstruct.
+# One include rather than editing httpd.conf further: somebody will mount their
+# own configuration over part of this image, and a single include line is one
+# thing to restore rather than a diff to reconstruct.
 #
 # php-fpm.conf is copied and left unreferenced. `httpd -t` below therefore does
 # not parse it, which is why the build check that follows explicitly includes it
@@ -207,8 +204,8 @@ RUN printf '\nInclude conf/extra/module-defaults.conf\nInclude conf/extra/app-se
 # Start Apache for real, and serve one request, before the image is published.
 #
 # `httpd -t` parses the configuration and does not run a module's own
-# initialisation — the same gap the nginx sibling's Dockerfile documents after a
-# Lua build passed the config test and then aborted every worker at startup.
+# initialisation. That gap is real and not theoretical: a module can pass the
+# config test and then abort every worker the moment the server starts.
 #
 # The request is for a static file rather than a .php one on purpose: there is no
 # php-fpm to reach at build time, and a request that must fail proves nothing.

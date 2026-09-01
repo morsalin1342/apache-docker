@@ -18,7 +18,7 @@ Two images, one Dockerfile, same 176 MB download. Pick by **where Apache sits**:
 
 ```yaml
 image: morsalin1342/apache:2.4.68           # Apache faces clients
-image: morsalin1342/apache:2.4.68-origin    # nginx / Cloudflare / an ALB faces clients
+image: morsalin1342/apache:2.4.68-origin    # a reverse proxy / CDN / load balancer faces clients
 ```
 
 | | main server | `-origin` |
@@ -101,10 +101,9 @@ path and hands that path to php-fpm, which opens it itself — a mismatch produc
 **PHP.** See above. `docker-php-ext-install`, Composer, WP-CLI and Node live in the php image,
 and a deploy hook that runs `composer install` runs there.
 
-**ModSecurity.** The [nginx sibling](https://github.com/morsalin1342/nginx-docker) ships it
-with the OWASP Core Rule Set; this one does not. A WAF belongs where requests enter, and in
-the deployment these images are built for that is nginx. A second WAF behind the first
-inspects the same bytes for the same verdict.
+**ModSecurity, or any WAF.** A WAF belongs where requests enter. This image is built to sit
+behind a reverse proxy, and a second WAF behind the first inspects the same bytes for the same
+verdict. If Apache is your outermost server, put one in front of it.
 
 **TLS, HTTP/2, compression, rate limiting, caching.** All shipped, all off. The gateway
 negotiates protocol and encoding with the client; re-compressing between two containers on one
