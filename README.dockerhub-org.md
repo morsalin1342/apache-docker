@@ -1,24 +1,34 @@
-# Apache Docker Image — static server, or php-fpm application server
+# Apache — Enterprise Web Server
 
-[![Docker Pulls](https://img.shields.io/docker/pulls/morsalin1342/apache.svg?style=for-the-badge&logo=docker)](https://hub.docker.com/r/morsalin1342/apache)
+**Published by [easydigital](https://hub.docker.com/u/easydigital)** · [GitHub](https://github.com/morsalin1342/apache-docker)
+
+[![Docker Pulls](https://img.shields.io/docker/pulls/easydigital/apache?style=for-the-badge&logo=docker)](https://hub.docker.com/r/easydigital/apache)
+[![Image Size](https://img.shields.io/docker/image-size/easydigital/apache/latest?style=for-the-badge&logo=docker)](https://hub.docker.com/r/easydigital/apache/tags)
 [![GitHub Stars](https://img.shields.io/github/stars/morsalin1342/apache-docker?style=for-the-badge&logo=github)](https://github.com/morsalin1342/apache-docker)
 [![License](https://img.shields.io/github/license/morsalin1342/apache-docker?style=for-the-badge)](https://github.com/morsalin1342/apache-docker/blob/master/LICENSE)
 
 Official Apache, configured. **Static files by default; PHP over FastCGI with one line.**
-There is no PHP in this image — it talks to [`morsalin1342/php`](https://hub.docker.com/r/morsalin1342/php)
-running php-fpm in its own container.
+There is no PHP in this image — it talks to [`easydigital/php`](https://hub.docker.com/r/easydigital/php)
+running php-fpm in its own container. Same image as `morsalin1342/apache` — published here for
+organizational deployments.
 
 ```bash
-docker pull morsalin1342/apache:latest
+docker pull easydigital/apache:latest
 ```
+
+## Why the easydigital Registry?
+
+- **Namespace isolation** — keep team pulls under the organization account
+- **Same image digest** — bit-for-bit identical to `morsalin1342/apache`
+- **CI/CD friendly** — predictable tags for automated pipelines
 
 ## Which tag
 
 Two images, one Dockerfile, same 176 MB download. Pick by **where Apache sits**:
 
 ```yaml
-image: morsalin1342/apache:2.4.68           # Apache faces clients
-image: morsalin1342/apache:2.4.68-origin    # a reverse proxy / CDN / load balancer faces clients
+image: easydigital/apache:2.4.68           # Apache faces clients
+image: easydigital/apache:2.4.68-origin    # a reverse proxy / CDN / load balancer faces clients
 ```
 
 | | main server | `-origin` |
@@ -62,7 +72,7 @@ compilation story: **nothing here is compiled, and Apache is never rebuilt.**
 ## Static, by default
 
 ```bash
-docker run -d -p 8080:80 -v "$PWD/site:/var/www/html" morsalin1342/apache
+docker run -d -p 8080:80 -v "$PWD/site:/var/www/html" easydigital/apache
 ```
 
 `.php` files are **refused with 403**, not served. That is the point: an image with no PHP
@@ -75,11 +85,11 @@ container returned the file contents with a 200.
 ```yaml
 services:
   php:
-    image: morsalin1342/php:8.4-fpm
+    image: easydigital/php:8.4-fpm
     volumes: ["./src:/var/www/html"]
 
   apache:
-    image: morsalin1342/apache
+    image: easydigital/apache
     depends_on: [php]
     volumes: ["./src:/var/www/html"]
     command: sh -c "a2enconf php-fpm && httpd-foreground"
@@ -156,10 +166,10 @@ broken for a whole release with every build still green.
 
 | Tag | Role |
 |---|---|
-| `morsalin1342/apache:2.4.68` | Apache is the main server |
-| `morsalin1342/apache:latest` | same, floating |
-| `morsalin1342/apache:2.4.68-origin` | Apache is behind a reverse proxy |
-| `morsalin1342/apache:origin` | same, floating |
+| `easydigital/apache:2.4.68` | Apache is the main server |
+| `easydigital/apache:latest` | same, floating |
+| `easydigital/apache:2.4.68-origin` | Apache is behind a reverse proxy |
+| `easydigital/apache:origin` | same, floating |
 
 The version tracks upstream httpd; a new patch release is a one-line bump. The unsuffixed tags
 are deliberately the main-server image — someone typing `apache:latest` without reading this
@@ -168,3 +178,21 @@ should get the one that works when Apache is what clients reach.
 ## Licence
 
 MIT — see the LICENSE file.
+
+---
+
+### 🔗 Related Images & Tools
+
+<!-- BEGIN GENERATED: related (from images.yaml in the org .github repository; do not edit by hand) -->
+| Image / Tool | Description |
+|--------------|-------------|
+| [easydigital/caddy](https://hub.docker.com/r/easydigital/caddy) | Standalone Caddy with WAF, rate limiting & caching |
+| [easydigital/frankenphp](https://hub.docker.com/r/easydigital/frankenphp) | Caddy + PHP app server in one container |
+| [easydigital/php](https://hub.docker.com/r/easydigital/php) | Traditional PHP-FPM & CLI images |
+| [easydigital/nginx](https://hub.docker.com/r/easydigital/nginx) | nginx with ModSecurity 3, Brotli, zstd & GeoIP2 |
+| [morsalin1342/apache](https://hub.docker.com/r/morsalin1342/apache) | Same image, personal namespace |
+<!-- END GENERATED: related -->
+
+---
+
+⭐ **If this image helps you, consider giving it a star on [GitHub](https://github.com/morsalin1342/apache-docker)!**

@@ -1,0 +1,42 @@
+name: Docs consistency
+
+# The shared facts of the sibling repositories (names, namespaces, descriptions)
+# live in manifest/images.yaml of the organisation's .github repository. This job
+# fails when this repository disagrees with it. It runs only in the source
+# repository; the org and sitespanel mirrors exist for Cloud Build.
+
+on:
+  pull_request:
+  push:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  consistency:
+    runs-on: ubuntu-latest
+    if: github.repository == 'morsalin1342/apache-docker'
+    steps:
+      - name: Check out this repository
+        uses: actions/checkout@v4
+
+      # TODO: pin ref to a commit SHA once the manifest is published, so a change
+      # to the manifest cannot change what this job runs without a reviewed bump.
+      - name: Check out the shared manifest
+        uses: actions/checkout@v4
+        with:
+          repository: easydigitalinternationallimited/.github
+          ref: main
+          path: .shared
+
+      - name: Install the YAML parser
+        run: python3 -m pip install --quiet pyyaml
+
+      - name: Check consistency with the manifest
+        run: >-
+          python3 .shared/manifest/sync_docs.py
+          --manifest .shared/manifest/images.yaml
+          --repo "${{ github.event.repository.name }}"
+          --dir . --check

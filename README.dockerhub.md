@@ -168,3 +168,17 @@ should get the one that works when Apache is what clients reach.
 ## Licence
 
 MIT — see the LICENSE file.
+
+---
+
+### 🔗 Related Images & Tools
+
+<!-- BEGIN GENERATED: related (from images.yaml in the org .github repository; do not edit by hand) -->
+| Image / Tool | Description |
+|--------------|-------------|
+| [morsalin1342/caddy](https://hub.docker.com/r/morsalin1342/caddy) | Standalone Caddy with WAF, rate limiting & caching |
+| [morsalin1342/frankenphp](https://hub.docker.com/r/morsalin1342/frankenphp) | Caddy + PHP app server in one container |
+| [morsalin1342/php](https://hub.docker.com/r/morsalin1342/php) | Traditional PHP-FPM & CLI images |
+| [morsalin1342/nginx](https://hub.docker.com/r/morsalin1342/nginx) | nginx with ModSecurity 3, Brotli, zstd & GeoIP2 |
+| [easydigital/apache](https://hub.docker.com/r/easydigital/apache) | Same image, organization namespace |
+<!-- END GENERATED: related -->

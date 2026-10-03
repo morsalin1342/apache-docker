@@ -165,6 +165,19 @@ The version tracks upstream httpd; a new patch release is a one-line bump. The u
 are deliberately the main-server image — someone typing `apache:latest` without reading this
 should get the one that works when Apache is what clients reach.
 
+## Related Images & Tools
+
+<!-- BEGIN GENERATED: related (from images.yaml in the org .github repository; do not edit by hand) -->
+Every image is published under `morsalin1342` (personal) and `easydigital` (organization), from the same build.
+
+| Repository | Images | Description |
+|---|---|---|
+| [caddy-docker](https://github.com/morsalin1342/caddy-docker) | `morsalin1342/caddy` · `easydigital/caddy` | Standalone Caddy with WAF, rate limiting & caching |
+| [frankenphp-docker](https://github.com/morsalin1342/frankenphp-docker) | `morsalin1342/frankenphp` · `easydigital/frankenphp` | Caddy + PHP app server in one container |
+| [php-docker](https://github.com/morsalin1342/php-docker) | `morsalin1342/php` · `easydigital/php` | Traditional PHP-FPM & CLI images |
+| [nginx-docker](https://github.com/morsalin1342/nginx-docker) | `morsalin1342/nginx` · `easydigital/nginx` | nginx with ModSecurity 3, Brotli, zstd & GeoIP2 |
+<!-- END GENERATED: related -->
+
 ## Licence
 
 MIT — see [LICENSE](LICENSE).
