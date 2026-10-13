@@ -5,8 +5,8 @@ tags you pull, because the two roles genuinely want different sets.
 
 | Tag | Role | Modules | Idle RSS |
 |---|---|---|---|
-| `apache:2.4.68`, `apache:latest` | **Apache is the main server**, facing clients | 46 | 13.9 MiB |
-| `apache:2.4.68-origin`, `apache:origin` | **Apache is behind a reverse proxy** that terminates TLS | 33 | 7.3 MiB |
+| `apache:2.4.69`, `apache:latest` | **Apache is the main server**, facing clients | 46 | 13.9 MiB |
+| `apache:2.4.69-origin`, `apache:origin` | **Apache is behind a reverse proxy** that terminates TLS | 33 | 7.3 MiB |
 
 Stock `httpd` loads 22 for comparison. (`httpd -M` reports 49, 36 and 25 — it counts `core`,
 `http` and `so`, which are compiled in and have no file.)
@@ -38,8 +38,8 @@ already carries, runs `httpd -t`, and rolls back if it fails.
 **Pick the tag that matches where Apache sits**, and the defaults are right as shipped:
 
 ```yaml
-image: morsalin1342/apache:2.4.68           # Apache faces clients
-image: morsalin1342/apache:2.4.68-origin    # a reverse proxy faces clients
+image: morsalin1342/apache:2.4.69           # Apache faces clients
+image: morsalin1342/apache:2.4.69-origin    # a reverse proxy faces clients
 ```
 
 Neither needs modules added for the ordinary cases — static sites, PHP over FastCGI,
@@ -117,7 +117,7 @@ handshake, resumed ones included. The file supplies the directive, `a2enmod ssl`
 
 ```console
 $ docker run --rm morsalin1342/apache sh -c 'a2enmod ssl >/dev/null && httpd-foreground'
-[mpm_event:notice] AH00489: Apache/2.4.68 (Unix) OpenSSL/3.5.6 configured -- resuming normal operations
+[mpm_event:notice] AH00489: Apache/2.4.69 (Unix) OpenSSL/3.5.7 configured -- resuming normal operations
 ```
 
 Verified by mutation, not by reading it back: deleting the `Include` line brings the warning

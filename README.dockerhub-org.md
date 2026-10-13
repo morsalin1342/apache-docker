@@ -27,8 +27,8 @@ docker pull easydigital/apache:latest
 Two images, one Dockerfile, same 176 MB download. Pick by **where Apache sits**:
 
 ```yaml
-image: easydigital/apache:2.4.68           # Apache faces clients
-image: easydigital/apache:2.4.68-origin    # a reverse proxy / CDN / load balancer faces clients
+image: easydigital/apache:2.4.69           # Apache faces clients
+image: easydigital/apache:2.4.69-origin    # a reverse proxy / CDN / load balancer faces clients
 ```
 
 | | main server | `-origin` |
@@ -166,9 +166,9 @@ broken for a whole release with every build still green.
 
 | Tag | Role |
 |---|---|
-| `easydigital/apache:2.4.68` | Apache is the main server |
+| `easydigital/apache:2.4.69` | Apache is the main server |
 | `easydigital/apache:latest` | same, floating |
-| `easydigital/apache:2.4.68-origin` | Apache is behind a reverse proxy |
+| `easydigital/apache:2.4.69-origin` | Apache is behind a reverse proxy |
 | `easydigital/apache:origin` | same, floating |
 
 The version tracks upstream httpd; a new patch release is a one-line bump. The unsuffixed tags

@@ -4,7 +4,7 @@
 
 | Version | Supported |
 |---------|-----------|
-| 2.4.68  | :white_check_mark: |
+| 2.4.69  | :white_check_mark: |
 
 The version tracks upstream `httpd`. Older tags stay on Docker Hub for reproducibility but do
 not receive fixes — pull the current tag.
@@ -51,6 +51,6 @@ This image is the official `httpd` image plus configuration. It compiles nothing
 no third-party modules.
 
 - [httpd](https://hub.docker.com/_/httpd) — the official Apache HTTP Server image, pinned to a
-  Debian-suffixed tag (`2.4.68-trixie`)
+  Debian-suffixed tag (`2.4.69-trixie`)
 
 If a vulnerability is found in that base, the fix is a base-image bump and a rebuild.

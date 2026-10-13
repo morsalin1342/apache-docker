@@ -105,7 +105,7 @@ cp README.dockerhub.md README.dockerhub-org.md
 ## Version upgrades
 
 1. Bump `ARG HTTPD_VERSION` and, if the base moved, `ARG DEBIAN_RELEASE` in the `Dockerfile`.
-   The Debian suffix is pinned on purpose: `httpd:2.4.68` follows whatever release upstream
+   The Debian suffix is pinned on purpose: `httpd:2.4.69` follows whatever release upstream
    considers current, so an unsuffixed tag can change distribution underneath you
 2. Rebuild both targets and confirm the module counts are unchanged — a renamed or dropped
    module in a new httpd release is exactly what this catches
