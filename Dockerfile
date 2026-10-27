@@ -125,9 +125,15 @@ LABEL org.opencontainers.image.title="apache" \
 # container. The official image has no HTTP client at all. `acl` (setfacl,
 # getfacl) lets an entrypoint grant a user access to a directory without
 # changing its owner.
+#
+# libbrotli1 (and libexpat1, if present) are upgraded to Debian's security
+# releases (libbrotli1 1.1.0-2+deb13u1; a high CVE in the version the official
+# base image still ships, 2026-10-27). Drop the line when the base image carries
+# them.
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends acl curl; \
+    apt-get install -y --no-install-recommends --only-upgrade libexpat1 libbrotli1; \
     rm -rf /var/lib/apt/lists/*
 
 # a2enmod, a2dismod, a2enconf, a2disconf.
