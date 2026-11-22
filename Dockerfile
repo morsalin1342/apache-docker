@@ -46,7 +46,10 @@
 # # What is turned on
 #
 #   rewrite      the reason Apache is chosen at all — applications whose URL
-#                scheme ships as .htaccess (PrestaShop, Mautic, QloApps)
+#                scheme ships as .htaccess (PrestaShop, Mautic, QloApps).
+#                .htaccess itself is off (AllowOverride None in
+#                app-server.conf); `a2enconf htaccess` turns it on, or the
+#                rules go in your own configuration
 #   proxy        \ together, how a request for a .php file reaches php-fpm
 #   proxy_fcgi   /
 #   proxy_http   the other half of mod_proxy: ProxyPass to an HTTP backend. Not
@@ -205,10 +208,11 @@ RUN mkdir -p /var/www/html
 # own configuration over part of this image, and a single include line is one
 # thing to restore rather than a diff to reconstruct.
 #
-# php-fpm.conf is copied and left unreferenced. `httpd -t` below therefore does
-# not parse it, which is why the build check that follows explicitly includes it
-# once — a shipped configuration file nothing ever parses is one that can be
-# broken for a release without anybody noticing.
+# php-fpm.conf and htaccess.conf are copied and left unreferenced: PHP and
+# .htaccess are each one `a2enconf` away. `httpd -t` below therefore does not
+# parse them, which is why the build check that follows explicitly includes
+# them once — a shipped configuration file nothing ever parses is one that can
+# be broken for a release without anybody noticing.
 #
 # conf/trusted-proxies.d/ is where you name the reverse proxy whose
 # X-Forwarded-For Apache may believe. It ships with an example and no .conf
@@ -216,6 +220,7 @@ RUN mkdir -p /var/www/html
 COPY conf/app-server.conf /usr/local/apache2/conf/extra/app-server.conf
 COPY conf/module-defaults.conf /usr/local/apache2/conf/extra/module-defaults.conf
 COPY conf/php-fpm.conf /usr/local/apache2/conf/extra/php-fpm.conf
+COPY conf/htaccess.conf /usr/local/apache2/conf/extra/htaccess.conf
 COPY conf/trusted-proxies.conf.example /usr/local/apache2/conf/trusted-proxies.d/trusted-proxies.conf.example
 RUN printf '\nInclude conf/extra/module-defaults.conf\nInclude conf/extra/app-server.conf\n' \
         >> /usr/local/apache2/conf/httpd.conf \
@@ -232,12 +237,13 @@ RUN printf '\nInclude conf/extra/module-defaults.conf\nInclude conf/extra/app-se
 # What this checks is that Apache starts with these modules loaded and serves.
 #
 # The opt-in configurations are syntax-checked separately, in a copy of
-# httpd.conf that is thrown away: PHP, and the trusted-proxy example. They are
-# shipped and included by nothing, so without this they are the files in the
-# image that could be broken for an entire release with every build still green.
+# httpd.conf that is thrown away: PHP, .htaccess, and the trusted-proxy
+# example. They are shipped and included by nothing, so without this they are
+# the files in the image that could be broken for an entire release with every
+# build still green.
 RUN set -eux; \
     cp /usr/local/apache2/conf/httpd.conf /tmp/opt-in.conf; \
-    printf '\nInclude conf/extra/php-fpm.conf\nInclude conf/trusted-proxies.d/trusted-proxies.conf.example\n' \
+    printf '\nInclude conf/extra/php-fpm.conf\nInclude conf/extra/htaccess.conf\nInclude conf/trusted-proxies.d/trusted-proxies.conf.example\n' \
         >> /tmp/opt-in.conf; \
     httpd -t -f /tmp/opt-in.conf; \
     rm -f /tmp/opt-in.conf

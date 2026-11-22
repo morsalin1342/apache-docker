@@ -49,6 +49,8 @@ with `a2enmod`, its configuration is yours.
 for a proxy you list in `conf/trusted-proxies.d/`, and listing one is yours to decide. See
 the README for the risk of listing more than the proxy itself.
 
+**`.htaccess` is ignored by default** (`AllowOverride None`). `a2enconf htaccess` turns it on.
+
 ## Upstream components
 
 This image is the official `httpd` image plus configuration. It compiles nothing and vendors

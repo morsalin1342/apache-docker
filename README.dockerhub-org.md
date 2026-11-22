@@ -134,6 +134,24 @@ ignores private addresses in the header; if your clients are on a private networ
 `RemoteIPInternalProxy` for the proxy instead. A CDN that sends the client in a header of its
 own is the same two lines with that header and the CDN's published address ranges.
 
+## .htaccess
+
+Off by default. `app-server.conf` sets `AllowOverride None`, so Apache ignores `.htaccess`
+files, rewrite rules in them included. To read them in the document root:
+
+```yaml
+    command: sh -c "a2enconf htaccess && httpd-foreground"
+```
+
+(`a2enconf php-fpm htaccess` for both.) That includes `conf/extra/htaccess.conf`, which allows
+`AuthConfig`, `FileInfo`, `Indexes` and `Limit`, and the `FollowSymLinks`,
+`SymLinksIfOwnerMatch`, `MultiViews` and `Indexes` options: what application `.htaccess` files
+use, without letting one turn on CGI or server-side includes.
+
+What it costs: Apache then looks for `.htaccess` in every directory on every request's path, and
+anything that can write into the document root can change how requests there are handled.
+Putting the rules in your own configuration avoids both.
+
 ## What is deliberately absent
 
 **PHP.** See above. `docker-php-ext-install`, Composer, WP-CLI and Node live in the php image,
@@ -184,11 +202,12 @@ slotmem_shm` refuses while `proxy_balancer` is loaded. See MODULES.md.
 | Path | What |
 |---|---|
 | `conf/extra/app-server.conf` | The base: document root, `.php` refusal, `remoteip`, hardening. Included. |
-| `conf/extra/php-fpm.conf` | The FastCGI handler. Shipped, **included by nothing**. |
+| `conf/extra/php-fpm.conf` | The FastCGI handler. Shipped, **included by nothing**; `a2enconf php-fpm`. |
+| `conf/extra/htaccess.conf` | `.htaccess` support. Shipped, **included by nothing**; `a2enconf htaccess`. |
 | `conf/trusted-proxies.d/*.conf` | The reverse proxy whose `X-Forwarded-For` Apache believes. Empty apart from an example. |
 
-Both are plain files — mount over either. `php-fpm.conf` is syntax-checked at build in a
-throwaway copy of `httpd.conf`, because a shipped file that nothing parses is one that can be
+All are plain files — mount over any of them. `php-fpm.conf`, `htaccess.conf` and the
+trusted-proxy example are syntax-checked at build in a throwaway copy of `httpd.conf`, because a shipped file that nothing parses is one that can be
 broken for a whole release with every build still green.
 
 ## Tags

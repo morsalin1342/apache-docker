@@ -43,7 +43,8 @@ image: morsalin1342/apache:2.4.71-origin    # a reverse proxy faces clients
 ```
 
 Neither needs modules added for the ordinary cases — static sites, PHP over FastCGI,
-reverse-proxying to a Node or Python container, `.htaccess`-style rewriting, gzip. Anything
+reverse-proxying to a Node or Python container, rewriting, gzip. (`.htaccess` files are read
+only after `a2enconf htaccess`; otherwise rewrite rules go in your own configuration.) Anything
 beyond that is one `a2enmod` away with no rebuild, which is exactly why neither list is longer.
 
 If you are on `-origin` and later put Apache in front, you do not need to switch images:
@@ -282,7 +283,7 @@ not loaded in either.
 | `remoteip` | ON added | The client's address instead of the gateway's — without it every log line, rate limit and "last login from" is wrong behind a proxy. Trusts no proxy until you name yours in `conf/trusted-proxies.d/` (see the README). |
 | `reqtimeout` | ON stock | Slowloris defence. Worth knowing you already have it. |
 | `request` | off | Makes the parsed request body available to other modules; some auth setups need it. |
-| `rewrite` | ON added | The reason to choose Apache — applications whose URL scheme ships as `.htaccess`. |
+| `rewrite` | ON added | The reason to choose Apache — applications whose URL scheme ships as `.htaccess`. `.htaccess` itself is read only after `a2enconf htaccess`; or put the rules in your configuration. |
 | `sed` | off | Edits responses with sed expressions. |
 | `session` | off | Apache-managed sessions. The application owns its own. |
 | `session_cookie` | off | Cookie store for `session`. |
