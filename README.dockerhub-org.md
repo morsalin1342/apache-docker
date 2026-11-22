@@ -183,13 +183,14 @@ MIT — see the LICENSE file.
 
 ### 🔗 Related Images & Tools
 
-<!-- BEGIN GENERATED: related (from images.yaml in the org .github repository; do not edit by hand) -->
+<!-- BEGIN GENERATED: related (from manifest/images.yaml in the morsalin1342/.github repository; do not edit by hand) -->
 | Image / Tool | Description |
 |--------------|-------------|
 | [easydigital/caddy](https://hub.docker.com/r/easydigital/caddy) | Standalone Caddy with WAF, rate limiting & caching |
 | [easydigital/frankenphp](https://hub.docker.com/r/easydigital/frankenphp) | Caddy + PHP app server in one container |
 | [easydigital/php](https://hub.docker.com/r/easydigital/php) | Traditional PHP-FPM & CLI images |
 | [easydigital/nginx](https://hub.docker.com/r/easydigital/nginx) | nginx with ModSecurity 3, Brotli, zstd & GeoIP2 |
+| [easydigital/adminer](https://hub.docker.com/r/easydigital/adminer) | Adminer database tool: the official image plus Alpine security updates |
 | [morsalin1342/apache](https://hub.docker.com/r/morsalin1342/apache) | Same image, personal namespace |
 <!-- END GENERATED: related -->
 

@@ -171,7 +171,7 @@ should get the one that works when Apache is what clients reach.
 
 ## Related Images & Tools
 
-<!-- BEGIN GENERATED: related (from images.yaml in the org .github repository; do not edit by hand) -->
+<!-- BEGIN GENERATED: related (from manifest/images.yaml in the morsalin1342/.github repository; do not edit by hand) -->
 Every image is published under `morsalin1342` (personal) and `easydigital` (organization), from the same build.
 
 | Repository | Images | Description |
@@ -180,6 +180,7 @@ Every image is published under `morsalin1342` (personal) and `easydigital` (orga
 | [frankenphp-docker](https://github.com/morsalin1342/frankenphp-docker) | `morsalin1342/frankenphp` · `easydigital/frankenphp` | Caddy + PHP app server in one container |
 | [php-docker](https://github.com/morsalin1342/php-docker) | `morsalin1342/php` · `easydigital/php` | Traditional PHP-FPM & CLI images |
 | [nginx-docker](https://github.com/morsalin1342/nginx-docker) | `morsalin1342/nginx` · `easydigital/nginx` | nginx with ModSecurity 3, Brotli, zstd & GeoIP2 |
+| [adminer-docker](https://github.com/morsalin1342/adminer-docker) | `morsalin1342/adminer` · `easydigital/adminer` | Adminer database tool: the official image plus Alpine security updates |
 <!-- END GENERATED: related -->
 
 ## Licence
