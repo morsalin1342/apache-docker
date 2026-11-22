@@ -3,6 +3,7 @@
 [![Docker Pulls](https://img.shields.io/docker/pulls/morsalin1342/apache.svg?style=for-the-badge&logo=docker)](https://hub.docker.com/r/morsalin1342/apache)
 [![GitHub Stars](https://img.shields.io/github/stars/morsalin1342/apache-docker?style=for-the-badge&logo=github)](https://github.com/morsalin1342/apache-docker)
 [![License](https://img.shields.io/github/license/morsalin1342/apache-docker?style=for-the-badge)](https://github.com/morsalin1342/apache-docker/blob/master/LICENSE)
+[![Docker Publish](https://github.com/morsalin1342/apache-docker/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/morsalin1342/apache-docker/actions/workflows/docker-publish.yml)
 
 Official Apache, configured. **Static files by default; PHP over FastCGI with one line.**
 There is no PHP in this image — it talks to [`morsalin1342/php`](https://hub.docker.com/r/morsalin1342/php)
@@ -11,6 +12,8 @@ running php-fpm in its own container.
 ```bash
 docker pull morsalin1342/apache:latest
 ```
+
+**Platform:** linux/amd64 only. `morsalin1342/apache` and `easydigital/apache` are the same image, pushed by the same build with the same digest; pull whichever you prefer.
 
 ## Which tag
 
@@ -185,4 +188,14 @@ Every image is published under `morsalin1342` (personal) and `easydigital` (orga
 
 ## Licence
 
-MIT — see [LICENSE](LICENSE).
+The files in this repository (the Dockerfile, `conf/`, the `a2enmod`-family scripts in
+`scripts/` and the docs) are MIT ([LICENSE](LICENSE)). That licence covers those files, not the
+software in the image, which keeps its own licences:
+
+| Component | Licence |
+|---|---|
+| Apache httpd, with the modules it ships | Apache-2.0 |
+| Debian packages from the base image and `apt-get` (OpenSSL, Brotli, curl, acl and the rest) | their own licences |
+
+Nothing else is compiled or downloaded into the image. Each build also writes an SPDX SBOM,
+kept as an artifact of its workflow run, which lists each package with the licence it declares.

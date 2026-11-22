@@ -1,4 +1,4 @@
-# Apache — Enterprise Web Server
+# Apache Docker Image — static server, or php-fpm application server
 
 **Published by [easydigital](https://hub.docker.com/u/easydigital)** · [GitHub](https://github.com/morsalin1342/apache-docker)
 
@@ -9,18 +9,13 @@
 
 Official Apache, configured. **Static files by default; PHP over FastCGI with one line.**
 There is no PHP in this image — it talks to [`easydigital/php`](https://hub.docker.com/r/easydigital/php)
-running php-fpm in its own container. Same image as `morsalin1342/apache` — published here for
-organizational deployments.
+running php-fpm in its own container.
 
 ```bash
 docker pull easydigital/apache:latest
 ```
 
-## Why the easydigital Registry?
-
-- **Namespace isolation** — keep team pulls under the organization account
-- **Same image digest** — bit-for-bit identical to `morsalin1342/apache`
-- **CI/CD friendly** — predictable tags for automated pipelines
+**Platform:** linux/amd64 only. `morsalin1342/apache` and `easydigital/apache` are the same image, pushed by the same build with the same digest; pull whichever you prefer.
 
 ## Which tag
 
@@ -177,7 +172,9 @@ should get the one that works when Apache is what clients reach.
 
 ## Licence
 
-MIT — see the LICENSE file.
+The repository's build files, configuration and `a2enmod`-family scripts are MIT. Apache httpd
+(Apache-2.0) and the Debian packages in the image keep their own licences; the
+[Licence section](https://github.com/morsalin1342/apache-docker#licence) says more.
 
 ---
 

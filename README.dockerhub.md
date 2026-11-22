@@ -12,6 +12,8 @@ running php-fpm in its own container.
 docker pull morsalin1342/apache:latest
 ```
 
+**Platform:** linux/amd64 only. `morsalin1342/apache` and `easydigital/apache` are the same image, pushed by the same build with the same digest; pull whichever you prefer.
+
 ## Which tag
 
 Two images, one Dockerfile, same 176 MB download. Pick by **where Apache sits**:
@@ -167,7 +169,9 @@ should get the one that works when Apache is what clients reach.
 
 ## Licence
 
-MIT — see the LICENSE file.
+The repository's build files, configuration and `a2enmod`-family scripts are MIT. Apache httpd
+(Apache-2.0) and the Debian packages in the image keep their own licences; the
+[Licence section](https://github.com/morsalin1342/apache-docker#licence) says more.
 
 ---
 
