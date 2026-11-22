@@ -116,10 +116,15 @@ FROM httpd:${HTTPD_VERSION}-${DEBIAN_RELEASE} AS origin
 
 ARG HTTPD_VERSION
 
+# licenses is empty on purpose. The repository's own files are MIT, but the image
+# combines software under many licences (the README's Licence section names the main
+# ones; the SBOM each build keeps lists every package), and no single SPDX expression
+# has been derived for all of it. The base image sets no licences label today; the
+# empty value keeps it that way if one is added.
 LABEL org.opencontainers.image.title="apache" \
       org.opencontainers.image.description="Apache behind a reverse proxy: php-fpm application server, no PHP and no TLS stack inside" \
       org.opencontainers.image.source="https://github.com/morsalin1342/apache-docker" \
-      org.opencontainers.image.licenses="MIT"
+      org.opencontainers.image.licenses=""
 
 # curl for the startup check below, and for anything that health-checks this
 # container. The official image has no HTTP client at all. `acl` (setfacl,
