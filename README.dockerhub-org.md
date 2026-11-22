@@ -1,4 +1,4 @@
-# Apache Docker Image — static server, or php-fpm application server
+# Apache httpd Docker Image — static server, or php-fpm application server
 
 **Published by [easydigital](https://hub.docker.com/u/easydigital)** · [GitHub](https://github.com/morsalin1342/apache-docker)
 
@@ -7,7 +7,7 @@
 [![GitHub Stars](https://img.shields.io/github/stars/morsalin1342/apache-docker?style=for-the-badge&logo=github)](https://github.com/morsalin1342/apache-docker)
 [![License](https://img.shields.io/github/license/morsalin1342/apache-docker?style=for-the-badge)](https://github.com/morsalin1342/apache-docker/blob/master/LICENSE)
 
-Official Apache, configured. **Static files by default; PHP over FastCGI with one line.**
+The official Apache httpd image (`httpd`), configured. **Static files by default; PHP over FastCGI with one line.**
 There is no PHP in this image — it talks to [`easydigital/php`](https://hub.docker.com/r/easydigital/php)
 running php-fpm in its own container.
 

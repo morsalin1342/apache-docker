@@ -1,11 +1,11 @@
-# Apache Docker Image — static server, or php-fpm application server
+# Apache httpd Docker Image — static server, or php-fpm application server
 
 [![Docker Pulls](https://img.shields.io/docker/pulls/morsalin1342/apache.svg?style=for-the-badge&logo=docker)](https://hub.docker.com/r/morsalin1342/apache)
 [![GitHub Stars](https://img.shields.io/github/stars/morsalin1342/apache-docker?style=for-the-badge&logo=github)](https://github.com/morsalin1342/apache-docker)
 [![License](https://img.shields.io/github/license/morsalin1342/apache-docker?style=for-the-badge)](https://github.com/morsalin1342/apache-docker/blob/master/LICENSE)
 [![Docker Publish](https://github.com/morsalin1342/apache-docker/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/morsalin1342/apache-docker/actions/workflows/docker-publish.yml)
 
-Official Apache, configured. **Static files by default; PHP over FastCGI with one line.**
+The official Apache httpd image (`httpd`), configured. **Static files by default; PHP over FastCGI with one line.**
 There is no PHP in this image — it talks to [`morsalin1342/php`](https://hub.docker.com/r/morsalin1342/php)
 running php-fpm in its own container.
 

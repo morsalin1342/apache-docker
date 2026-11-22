@@ -236,7 +236,7 @@ jobs:
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
           repository: morsalin1342/apache
           readme-filepath: ./README.dockerhub.md
-          short-description: 'Apache as a static server or php-fpm application server — no PHP inside'
+          short-description: 'Apache httpd as a static server or php-fpm application server — no PHP inside'
 
       - name: Update Docker Hub description (org repo)
         uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
@@ -245,4 +245,4 @@ jobs:
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
           repository: easydigital/apache
           readme-filepath: ./README.dockerhub-org.md
-          short-description: 'Apache as a static server or php-fpm application server — no PHP inside'
+          short-description: 'Apache httpd as a static server or php-fpm application server — no PHP inside'
