@@ -36,7 +36,7 @@ jobs:
     if: github.repository == 'morsalin1342/apache-docker'
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Extract httpd version from Dockerfile
         id: get_version
@@ -52,7 +52,7 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       # Both targets are built into the runner's Docker daemon only. Nothing
       # leaves the runner until both scans below have passed.
@@ -61,7 +61,7 @@ jobs:
       # unsuffixed tags are the ones most people will pull.
       - name: Build locally (main server)
         id: build_server
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           target: server
@@ -83,7 +83,7 @@ jobs:
       # above and this costs one config edit and one startup check.
       - name: Build locally (origin)
         id: build_origin
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           target: origin
@@ -96,7 +96,7 @@ jobs:
       # A fixable critical vulnerability in either image fails the run before
       # anything is pushed.
       - name: Scan the main-server image for fixable critical vulnerabilities
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: local/apache:server
           format: table
@@ -106,7 +106,7 @@ jobs:
 
       - name: Scan the origin image for fixable critical vulnerabilities
         if: ${{ !cancelled() && steps.build_origin.outcome == 'success' }}
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: local/apache:origin
           format: table
@@ -116,7 +116,7 @@ jobs:
 
       - name: Write the SBOM
         if: ${{ !cancelled() && steps.build_server.outcome == 'success' }}
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: local/apache:server
           format: spdx-json
@@ -125,14 +125,14 @@ jobs:
 
       - name: Keep the SBOM
         if: ${{ !cancelled() && steps.build_server.outcome == 'success' }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sbom-apache-server-${{ steps.get_version.outputs.version }}
           path: sbom.spdx.json
 
       - name: Write the origin SBOM
         if: ${{ !cancelled() && steps.build_origin.outcome == 'success' }}
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: local/apache:origin
           format: spdx-json
@@ -141,14 +141,14 @@ jobs:
 
       - name: Keep the origin SBOM
         if: ${{ !cancelled() && steps.build_origin.outcome == 'success' }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sbom-apache-origin-${{ steps.get_version.outputs.version }}
           path: sbom-origin.spdx.json
 
       - name: Log in to Docker Hub
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
@@ -158,7 +158,7 @@ jobs:
       # per target writes every tag, so both namespaces get the same digest.
       - name: Push the scanned main-server image
         if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           target: server
@@ -175,7 +175,7 @@ jobs:
       # should get the image that works when Apache is the thing clients reach.
       - name: Push the scanned origin image
         if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           target: origin
@@ -212,10 +212,10 @@ jobs:
     if: github.repository == 'morsalin1342/apache-docker' && github.event_name != 'pull_request'
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Update Docker Hub description (personal repo)
-        uses: peter-evans/dockerhub-description@v5
+        uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
@@ -224,7 +224,7 @@ jobs:
           short-description: 'Apache as a static server or php-fpm application server — no PHP inside'
 
       - name: Update Docker Hub description (org repo)
-        uses: peter-evans/dockerhub-description@v5
+        uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}

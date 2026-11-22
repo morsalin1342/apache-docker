@@ -20,12 +20,12 @@ jobs:
     if: github.repository == 'morsalin1342/apache-docker'
     steps:
       - name: Check out this repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # TODO: pin ref to a commit SHA once the manifest is published, so a change
       # to the manifest cannot change what this job runs without a reviewed bump.
       - name: Check out the shared manifest
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: morsalin1342/.github
           ref: main
