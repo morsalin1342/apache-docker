@@ -5,6 +5,8 @@ on:
     branches: [ "master" ]
     paths:
       - 'Dockerfile'
+      # A waiver changes what the scan lets through, so it runs the scan again.
+      - '.trivyignore'
       - 'conf/**'
       # scripts/ is baked into the image — a2enmod and the shared dependency
       # table ship in it, so a change here changes the artifact and must
@@ -18,6 +20,7 @@ on:
   pull_request:
     paths:
       - 'Dockerfile'
+      - '.trivyignore'
       - 'conf/**'
       - 'scripts/**'
       - '.github/workflows/docker-publish.yml'
@@ -93,25 +96,29 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # A fixable critical vulnerability in either image fails the run before
-      # anything is pushed.
-      - name: Scan the main-server image for fixable critical vulnerabilities
+      # A fixable critical or high vulnerability in either image fails the run
+      # before anything is pushed. A finding with no fixed version cannot be fixed
+      # by a rebuild, so it does not fail the run. A waiver goes in .trivyignore,
+      # with a reason and an expiry date; the file says how.
+      - name: Scan the main-server image for fixable critical and high vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: local/apache:server
           format: table
-          severity: CRITICAL
+          severity: CRITICAL,HIGH
           ignore-unfixed: true
+          trivyignores: .trivyignore
           exit-code: '1'
 
-      - name: Scan the origin image for fixable critical vulnerabilities
+      - name: Scan the origin image for fixable critical and high vulnerabilities
         if: ${{ !cancelled() && steps.build_origin.outcome == 'success' }}
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: local/apache:origin
           format: table
-          severity: CRITICAL
+          severity: CRITICAL,HIGH
           ignore-unfixed: true
+          trivyignores: .trivyignore
           exit-code: '1'
 
       - name: Write the SBOM
