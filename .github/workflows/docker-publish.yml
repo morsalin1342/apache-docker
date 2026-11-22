@@ -33,6 +33,12 @@ on:
 permissions:
   contents: read
 
+# One run at a time per branch. A second push waits for the first to finish
+# rather than cancelling it, so a half-pushed set of tags is never left behind.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build_and_publish:
     runs-on: ubuntu-latest
