@@ -14,14 +14,26 @@ on:
       - 'README.dockerhub.md'
       - 'README.dockerhub-org.md'
       - 'LICENSE'
+  # A pull request builds and scans both images. It never logs in and never pushes.
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - 'conf/**'
+      - 'scripts/**'
+      - '.github/workflows/docker-publish.yml'
+  # Weekly rebuild, so Debian security updates and a moved base image reach the
+  # published tags without waiting for a commit. It writes the same tags as a push.
+  schedule:
+    - cron: '23 4 * * 1'
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build_and_publish:
     runs-on: ubuntu-latest
     if: github.repository == 'morsalin1342/apache-docker'
-    permissions:
-      contents: read
     steps:
       - name: Check out the repo
         uses: actions/checkout@v7
@@ -37,21 +49,111 @@ jobs:
             echo "Could not extract version from Dockerfile."
             exit 1
           fi
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      # Both targets are built into the runner's Docker daemon only. Nothing
+      # leaves the runner until both scans below have passed.
+      #
+      # The main-server image: Apache facing clients. Default target, so the
+      # unsuffixed tags are the ones most people will pull.
+      - name: Build locally (main server)
+        id: build_server
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: server
+          load: true
+          push: false
+          tags: local/apache:server
+          # Enable GHA caching for faster builds.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # The origin image: Apache behind a reverse proxy that terminates TLS.
+      #
+      # A second build rather than a second Dockerfile — `server` is built FROM
+      # `origin`, so every layer here is already in the cache from the step
+      # above and this costs one config edit and one startup check.
+      - name: Build locally (origin)
+        id: build_origin
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: origin
+          load: true
+          push: false
+          tags: local/apache:origin
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # A fixable critical vulnerability in either image fails the run before
+      # anything is pushed.
+      - name: Scan the main-server image for fixable critical vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: local/apache:server
+          format: table
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Scan the origin image for fixable critical vulnerabilities
+        if: ${{ !cancelled() && steps.build_origin.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: local/apache:origin
+          format: table
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Write the SBOM
+        if: ${{ !cancelled() && steps.build_server.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: local/apache:server
+          format: spdx-json
+          output: sbom.spdx.json
+          exit-code: '0'
+
+      - name: Keep the SBOM
+        if: ${{ !cancelled() && steps.build_server.outcome == 'success' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom-apache-server-${{ steps.get_version.outputs.version }}
+          path: sbom.spdx.json
+
+      - name: Write the origin SBOM
+        if: ${{ !cancelled() && steps.build_origin.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: local/apache:origin
+          format: spdx-json
+          output: sbom-origin.spdx.json
+          exit-code: '0'
+
+      - name: Keep the origin SBOM
+        if: ${{ !cancelled() && steps.build_origin.outcome == 'success' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom-apache-origin-${{ steps.get_version.outputs.version }}
+          path: sbom-origin.spdx.json
+
       - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
-      # The main-server image: Apache facing clients. Default target, so the
-      # unsuffixed tags are the ones most people will pull.
-      - name: Build and push (main server)
-        id: build-and-push
+      # Same context and inputs as the local builds on the same builder, so every
+      # layer comes from their cache: what is pushed is what was scanned. One build
+      # per target writes every tag, so both namespaces get the same digest.
+      - name: Push the scanned main-server image
+        if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -62,20 +164,13 @@ jobs:
             morsalin1342/apache:latest
             easydigital/apache:${{ steps.get_version.outputs.version }}
             easydigital/apache:latest
-          # Enable GHA caching for faster builds.
           cache-from: type=gha
-          cache-to: type=gha,mode=max
 
-      # The origin image: Apache behind a reverse proxy that terminates TLS.
-      #
-      # A second build rather than a second Dockerfile — `server` is built FROM
-      # `origin`, so every layer here is already in the cache from the step
-      # above and this costs one config edit and one startup check.
-      #
       # There is deliberately no `-origin` floating alongside `latest`: the
       # unsuffixed tags mean "main server", and someone typing `apache:latest`
       # should get the image that works when Apache is the thing clients reach.
-      - name: Build and push (origin)
+      - name: Push the scanned origin image
+        if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -87,65 +182,30 @@ jobs:
             easydigital/apache:${{ steps.get_version.outputs.version }}-origin
             easydigital/apache:origin
           cache-from: type=gha
-          cache-to: type=gha,mode=max
 
-      # Interim scanning (planning: TASK-0008, Q-150), until the Cloud Build pipeline exists: after the push,
-      # a fixable critical vulnerability fails the run, and an SPDX SBOM is kept as a workflow artifact.
-      - name: Scan the pushed image for fixable critical vulnerabilities
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: easydigital/apache:${{ steps.get_version.outputs.version }}
-          format: table
-          severity: CRITICAL
-          ignore-unfixed: true
-          exit-code: '1'
-
-      - name: Write the SBOM
-        if: always()
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: easydigital/apache:${{ steps.get_version.outputs.version }}
-          format: spdx-json
-          output: sbom.spdx.json
-          exit-code: '0'
-
-      - name: Keep the SBOM
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: sbom-apache-server-${{ steps.get_version.outputs.version }}
-          path: sbom.spdx.json
-
-      - name: Scan the pushed origin image for fixable critical vulnerabilities
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: easydigital/apache:${{ steps.get_version.outputs.version }}-origin
-          format: table
-          severity: CRITICAL
-          ignore-unfixed: true
-          exit-code: '1'
-
-      - name: Write the origin SBOM
-        if: always()
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: easydigital/apache:${{ steps.get_version.outputs.version }}-origin
-          format: spdx-json
-          output: sbom.spdx.json
-          exit-code: '0'
-
-      - name: Keep the origin SBOM
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: sbom-apache-origin-${{ steps.get_version.outputs.version }}
-          path: sbom.spdx.json
+      - name: Check the pushed layers are the scanned layers
+        if: github.event_name != 'pull_request'
+        env:
+          VERSION: ${{ steps.get_version.outputs.version }}
+        run: |
+          status=0
+          for pair in "server:easydigital/apache:${VERSION}" "origin:easydigital/apache:${VERSION}-origin"; do
+            local_tag="local/apache:${pair%%:*}"
+            pushed_ref="${pair#*:}"
+            scanned=$(docker image inspect "$local_tag" --format '{{json .RootFS.Layers}}' | jq -c .)
+            pushed=$(docker buildx imagetools inspect "$pushed_ref" --format '{{json .Image.RootFS.DiffIDs}}' | jq -c .)
+            if [ "$scanned" != "$pushed" ]; then
+              echo "::error::${pushed_ref}: the pushed layers differ from the scanned ${local_tag} layers."
+              status=1
+            fi
+          done
+          exit "$status"
 
   update_readme:
-    # This job runs only after build_and_publish has succeeded.
+    # This job runs only after build_and_publish has succeeded, and never for a pull request.
     needs: build_and_publish
     runs-on: ubuntu-latest
-    if: github.repository == 'morsalin1342/apache-docker'
+    if: github.repository == 'morsalin1342/apache-docker' && github.event_name != 'pull_request'
     steps:
       - name: Check out the repo
         uses: actions/checkout@v7
