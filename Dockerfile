@@ -77,12 +77,12 @@
 #
 # # Two tags, because the two roles want different modules
 #
-#   apache:2.4.69           Apache is the main server, facing clients.
+#   apache:2.4.71           Apache is the main server, facing clients.
 #   apache:latest           TLS, HTTP/2, brotli, rate limiting, ACME, and the
 #                           proxy backends a front server reaches for.
 #                           46 modules. ~16 MiB idle.
 #
-#   apache:2.4.69-origin    Apache is behind a reverse proxy — the "origin" in
+#   apache:2.4.71-origin    Apache is behind a reverse proxy — the "origin" in
 #                           edge/origin terms. No TLS stack at all: the proxy
 #                           terminates it. 33 modules. ~7 MiB idle.
 #
@@ -98,12 +98,12 @@
 # What is excluded from *both*, and why, is in MODULES.md — which documents all
 # 130 modules the image ships, with a recommendation for each.
 
-ARG HTTPD_VERSION=2.4.69
+ARG HTTPD_VERSION=2.4.71
 ARG DEBIAN_RELEASE=trixie
 
 # The Debian-tagged image, not the bare version tag.
 #
-# `httpd:2.4.69` and `httpd:2.4.69-trixie` are the same image today, and that is
+# `httpd:2.4.71` and `httpd:2.4.71-trixie` are the same image today, and that is
 # exactly why the suffix is written down: the unsuffixed tag follows whatever
 # Debian release upstream considers current, so it moves to the next one without
 # this file changing. An image whose base distribution changed underneath a
@@ -126,14 +126,14 @@ LABEL org.opencontainers.image.title="apache" \
 # getfacl) lets an entrypoint grant a user access to a directory without
 # changing its owner.
 #
-# libbrotli1 (and libexpat1, if present) are upgraded to Debian's security
-# releases (libbrotli1 1.1.0-2+deb13u1; a high CVE in the version the official
-# base image still ships, 2026-10-27). Drop the line when the base image carries
-# them.
+# Every package the base image ships is upgraded to Debian's security releases
+# at build time, so a fix Debian has published (zlib1g CVE-2026-85091, apt,
+# libexpat1, libbrotli1) is in the image even before the official base image is
+# rebuilt.
 RUN set -eux; \
     apt-get update; \
+    apt-get upgrade -y --no-install-recommends; \
     apt-get install -y --no-install-recommends acl curl; \
-    apt-get install -y --no-install-recommends --only-upgrade libexpat1 libbrotli1; \
     rm -rf /var/lib/apt/lists/*
 
 # a2enmod, a2dismod, a2enconf, a2disconf.

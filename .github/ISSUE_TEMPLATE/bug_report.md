@@ -7,7 +7,7 @@ assignees: ''
 ---
 
 **Image tag(s) affected**
-<!-- e.g. morsalin1342/apache:2.4.69 or morsalin1342/apache:2.4.69-origin.
+<!-- e.g. morsalin1342/apache:2.4.71 or morsalin1342/apache:2.4.71-origin.
      The two tags load different module sets, so please say which. -->
 
 **Describe the bug**
