@@ -5,6 +5,7 @@ on:
     branches: [ "master" ]
     paths:
       - 'Dockerfile'
+      - '.dockerignore'
       # A waiver changes what the scan lets through, so it runs the scan again.
       - '.trivyignore'
       - 'conf/**'
@@ -20,6 +21,7 @@ on:
   pull_request:
     paths:
       - 'Dockerfile'
+      - '.dockerignore'
       - '.trivyignore'
       - 'conf/**'
       - 'scripts/**'
