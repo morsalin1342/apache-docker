@@ -139,7 +139,8 @@ LABEL org.opencontainers.image.title="apache" \
 # Every package the base image ships is upgraded to Debian's security releases
 # at build time, so a fix Debian has published (zlib1g CVE-2026-85091, apt,
 # libexpat1, libbrotli1) is in the image even before the official base image is
-# rebuilt.
+# rebuilt. Unpinned for the same reason; hadolint's DL3008 asks for pins.
+# hadolint ignore=DL3008
 RUN set -eux; \
     apt-get update; \
     apt-get upgrade -y --no-install-recommends; \
@@ -167,19 +168,15 @@ RUN set -eux; \
 # this image fail or come up silently broken when enabled alone, and a2enmod
 # needing to know that while a2dismod does not is how you get a container that
 # starts today and refuses to start after an unrelated change.
-COPY scripts/a2enmod scripts/a2dismod scripts/a2enconf scripts/a2disconf /usr/local/bin/
+COPY --chmod=0755 scripts/a2enmod scripts/a2dismod scripts/a2enconf scripts/a2disconf /usr/local/bin/
 COPY scripts/moddeps.sh /usr/local/lib/apache-moddeps.sh
-RUN chmod +x /usr/local/bin/a2enmod /usr/local/bin/a2dismod \
-             /usr/local/bin/a2enconf /usr/local/bin/a2disconf
 
 # The modules this role needs, through the command the image now ships.
 #
 # a2enmod rather than a sed loop: it is the same edit, it fails loudly when a
 # module is not in the image, and it means the build exercises the script that
 # users will run. A shim nobody's own build uses is a shim that breaks quietly.
-RUN a2enmod rewrite proxy proxy_http proxy_fcgi remoteip expires mime_magic \
-            filter deflate logio socache_shmcb unique_id allowmethods
-
+#
 # And one the stock image loads that this one should not.
 #
 # mod_autoindex generates a directory listing when DirectoryIndex finds no index
@@ -189,7 +186,9 @@ RUN a2enmod rewrite proxy proxy_http proxy_fcgi remoteip expires mime_magic \
 # away from doing it. With the module gone that line is inert.
 #
 # No behaviour changes: a directory with no index file is 403 either way.
-RUN a2dismod autoindex
+RUN a2enmod rewrite proxy proxy_http proxy_fcgi remoteip expires mime_magic \
+            filter deflate logio socache_shmcb unique_id allowmethods \
+    && a2dismod autoindex
 
 # The document root, created before the configuration that names it.
 #
@@ -199,7 +198,8 @@ RUN a2dismod autoindex
 # DocumentRoot is not a directory, so it is made here rather than left for a
 # bind mount to create: a container started without one would not come up at
 # all, and "no volume mounted" should be an empty site, not a crash loop.
-RUN mkdir -p /var/www/html
+# WORKDIR creates it.
+WORKDIR /var/www/html
 
 # The base configuration, included from httpd.conf — and the PHP one, which is
 # not.
@@ -251,7 +251,7 @@ RUN set -eux; \
 RUN set -eux; \
     echo 'STARTUP-OK' > /var/www/html/.build-check; \
     httpd -k start; \
-    for i in $(seq 1 20); do \
+    for _ in $(seq 1 20); do \
         curl -fsS -o /dev/null http://127.0.0.1/.build-check && break; \
         sleep 0.5; \
     done; \
@@ -326,7 +326,7 @@ RUN a2enmod ssl http2 brotli ratelimit md \
 RUN set -eux; \
     echo 'STARTUP-OK' > /var/www/html/.build-check; \
     httpd -k start; \
-    for i in $(seq 1 20); do \
+    for _ in $(seq 1 20); do \
         curl -fsS -o /dev/null http://127.0.0.1/.build-check && break; \
         sleep 0.5; \
     done; \
