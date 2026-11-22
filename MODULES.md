@@ -279,7 +279,7 @@ not loaded in either.
 | `proxy_wstunnel` | **ON server** | WebSockets. The most common thing to reach for after `proxy_http`, and its absence is a confusing failure rather than a clear one. |
 | `ratelimit` | **ON server** | Bandwidth cap per connection. Belongs where requests arrive. |
 | `reflector` | off | Echoes the request body back through the filter chain. Testing. |
-| `remoteip` | ON added | The client's address instead of the gateway's — without it every log line, rate limit and "last login from" is wrong. |
+| `remoteip` | ON added | The client's address instead of the gateway's — without it every log line, rate limit and "last login from" is wrong behind a proxy. Trusts no proxy until you name yours in `conf/trusted-proxies.d/` (see the README). |
 | `reqtimeout` | ON stock | Slowloris defence. Worth knowing you already have it. |
 | `request` | off | Makes the parsed request body available to other modules; some auth setups need it. |
 | `rewrite` | ON added | The reason to choose Apache — applications whose URL scheme ships as `.htaccess`. |

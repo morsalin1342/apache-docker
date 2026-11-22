@@ -45,6 +45,10 @@ it. Refusing is the safe default; enabling `php-fpm.conf` grants it.
 (`-origin`). An unloaded module is a file on disk that Apache never maps. If you enable one
 with `a2enmod`, its configuration is yours.
 
+**No reverse proxy is trusted by default.** `X-Forwarded-For` changes the client address only
+for a proxy you list in `conf/trusted-proxies.d/`, and listing one is yours to decide. See
+the README for the risk of listing more than the proxy itself.
+
 ## Upstream components
 
 This image is the official `httpd` image plus configuration. It compiles nothing and vendors

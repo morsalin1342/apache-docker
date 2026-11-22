@@ -57,7 +57,7 @@ compilation story: **nothing here is compiled, and Apache is never rebuilt.**
 | Modules loaded | 25 | **33** — see MODULES.md in the GitHub repo |
 | `mod_rewrite` | ❌ not loaded | ✅ |
 | PHP over FastCGI | ❌ | ✅ one `Include` line |
-| Real client IP behind a proxy | ❌ | ✅ `remoteip`, with trusted ranges |
+| Real client IP behind a proxy | ❌ | ✅ `remoteip` loaded; trusts the proxy you name, none by default |
 | `.php` when PHP is off | served **as source** | ✅ refused |
 | Document root | `/usr/local/apache2/htdocs` | `/var/www/html`, matching the php image |
 | Startup proven at build | ❌ | ✅ starts and serves before publish |
@@ -100,6 +100,39 @@ services:
 **Both containers must mount the application at the same path.** Apache maps a URL to a file
 path and hands that path to php-fpm, which opens it itself — a mismatch produces
 `Primary script unknown`, php-fpm looking for a file that exists only in the other container.
+
+## Behind a reverse proxy: the client's address
+
+By default **no proxy is trusted**, on either tag. `REMOTE_ADDR`, `%a` in the access log and
+what PHP sees are the address that connected, and an `X-Forwarded-For` header a client sends
+changes nothing.
+
+To take the client's address from your proxy's header, add a file to
+`/usr/local/apache2/conf/trusted-proxies.d/` that names the proxy:
+
+```apache
+# trusted-proxies.conf
+RemoteIPHeader X-Forwarded-For
+RemoteIPTrustedProxy 172.18.0.2
+```
+
+```bash
+docker run -d \
+    -v "$PWD/trusted-proxies.conf:/usr/local/apache2/conf/trusted-proxies.d/trusted-proxies.conf:ro" \
+    easydigital/apache:2.4.71-origin
+```
+
+Apache then replaces the client address with the header's value only on requests that come from
+a listed address. The directory ships `trusted-proxies.conf.example` to start from.
+
+**The risk is in what you list.** Anything that can reach Apache from a listed address can set
+the header to any value it likes, so list your proxy's own address, or the smallest subnet that
+holds it. A wide range such as `172.16.0.0/12` trusts every container on every Docker network,
+not just the proxy. Keep both lines: `RemoteIPHeader` without `RemoteIPTrustedProxy` (or
+`RemoteIPInternalProxy`) believes the header from every client. `RemoteIPTrustedProxy` also
+ignores private addresses in the header; if your clients are on a private network, use
+`RemoteIPInternalProxy` for the proxy instead. A CDN that sends the client in a header of its
+own is the same two lines with that header and the CDN's published address ranges.
 
 ## What is deliberately absent
 
@@ -152,6 +185,7 @@ slotmem_shm` refuses while `proxy_balancer` is loaded. See MODULES.md.
 |---|---|
 | `conf/extra/app-server.conf` | The base: document root, `.php` refusal, `remoteip`, hardening. Included. |
 | `conf/extra/php-fpm.conf` | The FastCGI handler. Shipped, **included by nothing**. |
+| `conf/trusted-proxies.d/*.conf` | The reverse proxy whose `X-Forwarded-For` Apache believes. Empty apart from an example. |
 
 Both are plain files — mount over either. `php-fpm.conf` is syntax-checked at build in a
 throwaway copy of `httpd.conf`, because a shipped file that nothing parses is one that can be

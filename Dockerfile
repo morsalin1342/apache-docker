@@ -55,7 +55,9 @@
 #                proxied. Loaded so that reaching a Node or Python container is
 #                configuration rather than a rebuild
 #   remoteip     without it every access log line and every application that
-#                reads REMOTE_ADDR sees the gateway's address, not the client's
+#                reads REMOTE_ADDR sees the gateway's address, not the client's.
+#                Loaded, and trusting no proxy until you name yours in
+#                conf/trusted-proxies.d/ — see app-server.conf
 #   headers      response header manipulation, which several applications need
 #   expires      cache headers for static assets served directly
 #   mime_magic   content type by content when the extension does not say
@@ -207,9 +209,14 @@ RUN mkdir -p /var/www/html
 # not parse it, which is why the build check that follows explicitly includes it
 # once — a shipped configuration file nothing ever parses is one that can be
 # broken for a release without anybody noticing.
+#
+# conf/trusted-proxies.d/ is where you name the reverse proxy whose
+# X-Forwarded-For Apache may believe. It ships with an example and no .conf
+# file, so by default no proxy is trusted; see app-server.conf.
 COPY conf/app-server.conf /usr/local/apache2/conf/extra/app-server.conf
 COPY conf/module-defaults.conf /usr/local/apache2/conf/extra/module-defaults.conf
 COPY conf/php-fpm.conf /usr/local/apache2/conf/extra/php-fpm.conf
+COPY conf/trusted-proxies.conf.example /usr/local/apache2/conf/trusted-proxies.d/trusted-proxies.conf.example
 RUN printf '\nInclude conf/extra/module-defaults.conf\nInclude conf/extra/app-server.conf\n' \
         >> /usr/local/apache2/conf/httpd.conf \
     && httpd -t
@@ -224,15 +231,16 @@ RUN printf '\nInclude conf/extra/module-defaults.conf\nInclude conf/extra/app-se
 # php-fpm to reach at build time, and a request that must fail proves nothing.
 # What this checks is that Apache starts with these modules loaded and serves.
 #
-# The opt-in PHP configuration is syntax-checked separately, in a copy of
-# httpd.conf that is thrown away. It is shipped and included by nothing, so
-# without this it is the one file in the image that could be broken for an
-# entire release with every build still green.
+# The opt-in configurations are syntax-checked separately, in a copy of
+# httpd.conf that is thrown away: PHP, and the trusted-proxy example. They are
+# shipped and included by nothing, so without this they are the files in the
+# image that could be broken for an entire release with every build still green.
 RUN set -eux; \
-    cp /usr/local/apache2/conf/httpd.conf /tmp/with-php.conf; \
-    printf '\nInclude conf/extra/php-fpm.conf\n' >> /tmp/with-php.conf; \
-    httpd -t -f /tmp/with-php.conf; \
-    rm -f /tmp/with-php.conf
+    cp /usr/local/apache2/conf/httpd.conf /tmp/opt-in.conf; \
+    printf '\nInclude conf/extra/php-fpm.conf\nInclude conf/trusted-proxies.d/trusted-proxies.conf.example\n' \
+        >> /tmp/opt-in.conf; \
+    httpd -t -f /tmp/opt-in.conf; \
+    rm -f /tmp/opt-in.conf
 
 RUN set -eux; \
     echo 'STARTUP-OK' > /var/www/html/.build-check; \
