@@ -186,8 +186,7 @@ reimplemented against the upstream layout.
 ```bash
 a2enmod --list             # every module in the image and whether it is enabled
 a2enmod deflate http2      # uncomment the LoadModule lines httpd.conf already carries
-a2dismod autoindex         # this image already does this one
-a2dismod autoindex         # comment one back out
+a2dismod autoindex         # comment one back out (this image already does this one)
 a2enconf php-fpm           # append an Include for conf/extra/php-fpm.conf
 a2disconf php-fpm          # and remove it
 ```

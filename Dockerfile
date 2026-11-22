@@ -3,8 +3,8 @@
 # **This image contains no PHP.** PHP runs in its own container — the sibling
 # `morsalin1342/php` image, php-fpm listening on :9000 — and Apache reaches it
 # over FastCGI when you switch that on. That separation is the whole point: one
-# image is a web server, the other is a PHP runtime with 57 extensions and a
-# toolchain, and neither has to be rebuilt when the other moves.
+# image is a web server, the other is a PHP runtime with 52 extensions of its own
+# and a toolchain, and neither has to be rebuilt when the other moves.
 #
 # It follows that PHP cannot be the default. A stock `docker run` of this image
 # serves static files; proxying .php to a container called `php` that nobody

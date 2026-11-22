@@ -184,8 +184,7 @@ reimplemented against the upstream layout.
 ```bash
 a2enmod --list             # every module in the image and whether it is enabled
 a2enmod deflate http2      # uncomment the LoadModule lines httpd.conf already carries
-a2dismod autoindex         # this image already does this one
-a2dismod autoindex         # comment one back out
+a2dismod autoindex         # comment one back out (this image already does this one)
 a2enconf php-fpm           # append an Include for conf/extra/php-fpm.conf
 a2disconf php-fpm          # and remove it
 ```
@@ -247,13 +246,13 @@ Every image is published under `morsalin1342` (personal) and `easydigital` (orga
 
 ## Licence
 
-The files in this repository (the Dockerfile, `conf/`, the `a2enmod`-family scripts in
-`scripts/` and the docs) are MIT ([LICENSE](LICENSE)). That licence covers those files, not the
+The files in this repository (the Dockerfile, `conf/`, the scripts in `scripts/` and the docs)
+are MIT ([LICENSE](LICENSE)). That licence covers those files, not the
 software in the image, which keeps its own licences:
 
 | Component | Licence |
 |---|---|
-| Apache httpd, with the modules it ships | Apache-2.0 |
+| Apache httpd, with the modules it ships | Apache-2.0. httpd's LICENSE file also gives the separate notices of a few subcomponents it includes, such as `mod_mime_magic` and the PCRE wrapper |
 | Debian packages from the base image and `apt-get` (OpenSSL, Brotli, curl, acl and the rest) | their own licences |
 
 Nothing else is compiled or downloaded into the image. Each build also writes an SPDX SBOM,
