@@ -67,6 +67,10 @@ jobs:
           target: server
           load: true
           push: false
+          # Scheduled and manual runs are the security rebuilds: skip the build cache
+          # so the OS package upgrade really runs again, and pull the base image again.
+          no-cache: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+          pull: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
           tags: local/apache:server
           # Enable GHA caching for faster builds.
           cache-from: type=gha
