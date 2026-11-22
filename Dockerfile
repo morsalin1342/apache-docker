@@ -85,16 +85,21 @@
 #   apache:2.4.71           Apache is the main server, facing clients.
 #   apache:latest           TLS, HTTP/2, brotli, rate limiting, ACME, and the
 #                           proxy backends a front server reaches for.
-#                           46 modules. ~16 MiB idle.
+#                           49 modules in `httpd -M`. About 13 MiB idle.
 #
 #   apache:2.4.71-origin    Apache is behind a reverse proxy — the "origin" in
 #                           edge/origin terms. No TLS stack at all: the proxy
-#                           terminates it. 33 modules. ~7 MiB idle.
+#                           terminates it. 36 modules in `httpd -M`. About
+#                           7 MiB idle.
 #
-# Same layers, same download; the only difference is which LoadModule lines are
-# uncommented. The split exists because the measurement is not marginal — 16.2
-# MiB against 7.1 MiB is 2.3x, paid by every container, and an origin server
-# will never negotiate TLS or HTTP/2 no matter how long it runs.
+# (`httpd -M` counts core, so and http, which are compiled in; the LoadModule
+# lines are three fewer, 46 and 33.)
+#
+# Same base layers, same download; the only difference is which LoadModule lines
+# are uncommented. The split exists because the measurement is not marginal —
+# about 13 MiB against about 7 MiB idle (`docker stats`, varying a little by
+# host), paid by every container, and an origin server will never negotiate TLS
+# or HTTP/2 no matter how long it runs.
 #
 # Neither list is "everything that would load". Both are hand-picked, and the
 # origin list is the shared base the server list adds to, so a module is never
@@ -286,8 +291,8 @@ WORKDIR /var/www/html
 # decisions, so each of these is one:
 #
 #   ssl                  the reason this tag exists
-#   http2                HTTP/2 to real clients. +3.4 MiB idle, which is not
-#                        worth paying on an origin and plainly is here
+#   http2                HTTP/2 to real clients. About +4 MiB idle, which is
+#                        not worth paying on an origin and plainly is here
 #   brotli               better than gzip, and browsers only offer `br` over
 #                        HTTPS — so it is useful in exactly this tag and dead
 #                        weight in the other one

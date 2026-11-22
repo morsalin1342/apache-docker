@@ -5,15 +5,16 @@ tags you pull, because the two roles genuinely want different sets.
 
 | Tag | Role | Modules | Idle RSS |
 |---|---|---|---|
-| `apache:2.4.71`, `apache:latest` | **Apache is the main server**, facing clients | 46 | 13.9 MiB |
-| `apache:2.4.71-origin`, `apache:origin` | **Apache is behind a reverse proxy** that terminates TLS | 33 | 7.3 MiB |
+| `apache:2.4.71`, `apache:latest` | **Apache is the main server**, facing clients | 49 | about 13 MiB |
+| `apache:2.4.71-origin`, `apache:origin` | **Apache is behind a reverse proxy** that terminates TLS | 36 | about 7 MiB |
 
-Stock `httpd` loads 22 for comparison. (`httpd -M` reports 49, 36 and 25 — it counts `core`,
-`http` and `so`, which are compiled in and have no file.)
+Stock `httpd` loads 25 for comparison. These are `httpd -M` counts, which include `core`, `http`
+and `so`: they are compiled in and have no file, so the `LoadModule` lines number 46, 33 and 22.
+Idle RSS is from `docker stats` on an idle container and varies a little by host.
 
-Same layers and the same 176 MB download; the only difference is which `LoadModule` lines are
-uncommented. The split exists because the measurement is not marginal — **2.3×**, paid by every
-container, and an origin server will never negotiate TLS or HTTP/2 no matter how long it runs.
+Same base layers and the same download (about 46 MB compressed); the only difference is which
+`LoadModule` lines are uncommented. The split exists because the measurement is not marginal —
+**nearly 2×**, paid by every container, and an origin server will never negotiate TLS or HTTP/2 no matter how long it runs.
 
 **Both lists are hand-picked.** 105 of the 130 modules will happily load together and start
 clean — that is measured, not assumed — and the result is a container carrying WebDAV write
@@ -48,7 +49,8 @@ only after `a2enconf htaccess`; otherwise rewrite rules go in your own configura
 beyond that is one `a2enmod` away with no rebuild, which is exactly why neither list is longer.
 
 If you are on `-origin` and later put Apache in front, you do not need to switch images:
-`a2enmod ssl http2 brotli ratelimit` is the difference.
+`a2enmod ssl http2 brotli ratelimit md proxy_wstunnel proxy_uwsgi proxy_balancer lbmethod_byrequests vhost_alias macro`
+is the difference (`a2enmod` adds `watchdog` and `slotmem_shm` for `md` and `proxy_balancer`).
 
 **Never on a public server:** `proxy_connect` (turns Apache into an open forward proxy),
 `info` (renders your entire configuration at a URL), `include` (SSI — makes any writable file
@@ -92,7 +94,7 @@ Two exceptions are refusals rather than resolutions. **MPMs conflict**: only one
 swapping yours out because you asked for a different one is a bigger decision than a helper
 command should make, so `a2enmod mpm_prefork` tells you to run `a2dismod mpm_event` first.
 
-**Verified by re-running the sweep.** Every one of the 100 unloaded modules is enabled on its
+**Verified by re-running the sweep.** Every module the image does not load is enabled on its
 own, config-tested, and started in the foreground:
 
 | | modules that fail, warn, or come up broken |
@@ -235,7 +237,7 @@ not loaded in either.
 | `headers` | ON stock | Header editing. Several applications require it. |
 | `heartbeat` | off | Broadcasts load to a balancer front-end. |
 | `heartmonitor` | off | Collects those broadcasts, for `lbmethod_heartbeat`. |
-| `http2` | **ON server** | HTTP/2 to clients. +3.4 MiB idle — worth it facing real browsers, wasted between two containers on one host. |
+| `http2` | **ON server** | HTTP/2 to clients. About +4 MiB idle — worth it facing real browsers, wasted between two containers on one host. |
 | `ident` | off | RFC1413 lookups. Dead protocol, adds latency to every request. |
 | `imagemap` | off | Server-side image maps. |
 | `include` | off | SSI. **Deliberately off** — it turns any writable file into a code path. |
@@ -254,7 +256,7 @@ not loaded in either.
 | `macro` | **ON server** | `<Macro>` in configuration — worth having once you are hand-writing more than one vhost. |
 | `md` | **ON server** | ACME certificates in Apache, so renewal needs no second container. Pulls in `watchdog`. |
 | `mime` | ON stock | Content type from extension. |
-| `mime_magic` | ON added | Content type by sniffing when the extension does not say. **The most arguable of the eight** — costs a read of each file's first bytes. Drop it if your content is all known extensions. |
+| `mime_magic` | ON added | Content type by sniffing when the extension does not say. **The most arguable of the twelve** — costs a read of each file's first bytes. Drop it if your content is all known extensions. |
 | `mpm_event` | ON stock | The right MPM here: no PHP runs in-process, so there is nothing to serialise. |
 | `mpm_prefork` | off | Only if you enable `cgi` or a non-thread-safe in-process module. Unload `mpm_event` first — only one MPM may load. |
 | `mpm_worker` | off | Superseded by `event` for this workload. |

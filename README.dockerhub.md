@@ -16,7 +16,8 @@ docker pull morsalin1342/apache:latest
 
 ## Which tag
 
-Two images, one Dockerfile, same 176 MB download. Pick by **where Apache sits**:
+Two images, one Dockerfile, the same download: about 46 MB compressed, as Docker Hub reports
+it for the published tags. Pick by **where Apache sits**:
 
 ```yaml
 image: morsalin1342/apache:2.4.71           # Apache faces clients
@@ -27,15 +28,20 @@ image: morsalin1342/apache:2.4.71-origin    # a reverse proxy / CDN / load balan
 |---|---|---|
 | TLS, HTTP/2, brotli, rate limiting, ACME | ✅ | ❌ — whatever is in front already does it |
 | Static, PHP over FastCGI, `ProxyPass`, rewrite, gzip | ✅ | ✅ |
-| Modules loaded | 46 | 33 |
-| Idle memory | 13.9 MiB | **7.3 MiB** |
+| Modules loaded (`httpd -M`) | 49 | 36 |
+| Idle memory (`docker stats`) | about 13 MiB | **about 7 MiB** |
 
 The names come from edge/origin terminology: the *origin* is the server behind the thing facing
-the internet. The split exists because 2.3× idle memory, paid by every container, is not a
-rounding error — and an origin will never negotiate TLS or HTTP/2 however long it runs.
+the internet. The split exists because nearly twice the idle memory, paid by every container, is
+not a rounding error — and an origin will never negotiate TLS or HTTP/2 however long it runs.
 
-Switching later needs no new image: `a2enmod ssl http2 brotli ratelimit` on `-origin` is
-exactly the difference.
+Switching later needs no new image. On `-origin`,
+`a2enmod ssl http2 brotli ratelimit md proxy_wstunnel proxy_uwsgi proxy_balancer lbmethod_byrequests vhost_alias macro`
+is exactly the difference: those eleven, plus `watchdog` and `slotmem_shm`, which `a2enmod` pulls
+in for `md` and `proxy_balancer`.
+
+`httpd -M` counts `core`, `so` and `http`, which are compiled in; the `LoadModule` lines are three
+fewer, 46 and 33.
 
 ## Why this image
 
@@ -51,7 +57,7 @@ compilation story: **nothing here is compiled, and Apache is never rebuilt.**
 
 | | Official `httpd` | This image |
 |---|---|---|
-| Modules loaded | 25 | **33** — see MODULES.md in the GitHub repo |
+| Modules loaded (`httpd -M`) | 25 | **36** on `-origin`, 49 on the main-server tag — see MODULES.md in the GitHub repo |
 | `mod_rewrite` | ❌ not loaded | ✅ |
 | PHP over FastCGI | ❌ | ✅ one `Include` line |
 | Real client IP behind a proxy | ❌ | ✅ `remoteip` loaded; trusts the proxy you name, none by default |

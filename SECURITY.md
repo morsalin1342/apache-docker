@@ -41,8 +41,8 @@ vulnerability — see the `a2enconf php-fpm` section of the README.
 PHP, and a server that hands back the source of a file it cannot run discloses whatever is in
 it. Refusing is the safe default; enabling `php-fpm.conf` grants it.
 
-**Most modules ship unloaded.** The image carries 130 modules and loads 46 (`latest`) or 33
-(`-origin`). An unloaded module is a file on disk that Apache never maps. If you enable one
+**Most modules ship unloaded.** The image carries 130 modules and loads 49 (`latest`) or 36
+(`-origin`), as `httpd -M` counts them (core, so and http included). An unloaded module is a file on disk that Apache never maps. If you enable one
 with `a2enmod`, its configuration is yours.
 
 **No reverse proxy is trusted by default.** `X-Forwarded-For` changes the client address only

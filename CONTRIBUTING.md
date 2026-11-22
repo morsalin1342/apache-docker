@@ -36,8 +36,8 @@ If it should be on by default, open an issue with the title `Module: <name>` and
    sleep 3 && docker stats --no-stream m && docker logs m | grep warn
    ```
 
-   A module that is free is an easy yes. `mod_http2` costs +3.4 MiB idle, which is why it is in
-   one tag and not the other.
+   A module that is free is an easy yes. `mod_http2` costs about +4 MiB idle, which is why it is
+   in one tag and not the other.
 
 MODULES.md documents every one of the 130 modules and why it is on or off. If you disagree with
 a call, that file is the argument to engage with.
