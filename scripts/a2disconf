@@ -1,0 +1,72 @@
+#!/bin/sh
+# a2disconf — disable one or more configuration fragments.
+#
+# The inverse of a2enconf: it removes the Include line that command appended.
+# The fragment itself is left in conf/extra, so re-enabling is one command and
+# nothing was destroyed.
+#
+# Like the others, this tests the configuration and rolls back rather than
+# leaving a container that cannot start — which matters here because disabling
+# a fragment another one depends on is a config error, not a silent no-op.
+
+set -eu
+
+CONF="${HTTPD_CONF:-/usr/local/apache2/conf/httpd.conf}"
+EXTRA="${HTTPD_EXTRA:-/usr/local/apache2/conf/extra}"
+
+if [ $# -eq 0 ]; then
+    echo "usage: a2disconf CONF [CONF...]" >&2
+    echo "       names are without the .conf suffix, e.g. 'a2disconf php-fpm'" >&2
+    echo "       available:" >&2
+    for f in "$EXTRA"/*.conf; do
+        [ -f "$f" ] || continue
+        b="$(basename "$f" .conf)"
+        echo "         $b" >&2
+    done
+    exit 2
+fi
+
+backup="$(mktemp)"
+cp "$CONF" "$backup"
+changed=0
+
+for name in "$@"; do
+    conf="${name%.conf}"
+    file="$EXTRA/${conf}.conf"
+
+    if [ ! -f "$file" ]; then
+        # A fragment that is gone but still included is exactly the case
+        # this command exists to clean up, so a missing file is not fatal —
+        # the Include line is removed either way.
+        echo "a2disconf: note — ${conf}.conf is not in $EXTRA; removing any include of it"
+    fi
+
+    # Match the include however it is spelled — an absolute path, or the
+    # conf-relative form Apache's own httpd.conf uses.
+    if ! grep -qE "^[[:space:]]*Include([[:space:]]+Optional)?[[:space:]]+.*extra/${conf}\.conf" "$CONF"; then
+        echo "a2disconf: ${conf} is already disabled"
+        continue
+    fi
+
+    sed -i "\|^[[:space:]]*Include\([[:space:]][[:space:]]*Optional\)\?[[:space:]][[:space:]]*.*extra/${conf}\.conf|d" "$CONF"
+    echo "a2disconf: disabling ${conf}"
+    changed=1
+done
+
+if [ "$changed" -eq 0 ]; then
+    rm -f "$backup"
+    exit 0
+fi
+
+# Capture the complaint before rolling back — afterwards the configuration is
+# valid again and httpd -t will say "Syntax OK", which is not what happened.
+if ! why="$(httpd -t 2>&1)"; then
+    echo "a2disconf: the configuration does not pass httpd -t with that change; rolling back" >&2
+    echo "$why" | grep -v '^Syntax OK$' | sed 's/^/           /' >&2
+    cp "$backup" "$CONF"
+    rm -f "$backup"
+    exit 1
+fi
+
+rm -f "$backup"
+echo "a2disconf: done — restart Apache for it to take effect"

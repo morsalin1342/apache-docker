@@ -1,0 +1,11 @@
+# Only what the Dockerfile copies from the build context is sent to the builder:
+# conf/ and the a2enmod-family scripts. Everything else (the git history, the
+# docs, the workflows, scripts/check-upstream.sh) stays out, so it can neither
+# bloat the context nor end up in a layer by accident.
+*
+!conf/
+!scripts/a2enmod
+!scripts/a2dismod
+!scripts/a2enconf
+!scripts/a2disconf
+!scripts/moddeps.sh

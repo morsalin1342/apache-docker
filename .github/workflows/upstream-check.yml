@@ -1,0 +1,29 @@
+name: Upstream versions
+
+# Trivy scans the image's Debian packages but cannot see what the Dockerfile
+# builds from source, and Dependabot cannot move a FROM line built from an ARG.
+# This job compares every version the Dockerfile pins with the latest upstream
+# release and fails, listing what is behind. It changes nothing.
+
+on:
+  schedule:
+    - cron: '41 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    if: github.repository == 'morsalin1342/apache-docker'
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compare the pinned versions with upstream
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash scripts/check-upstream.sh Dockerfile

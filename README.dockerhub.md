@@ -1,0 +1,247 @@
+# Apache httpd Docker Image — static server, or php-fpm application server
+
+[![Docker Pulls](https://img.shields.io/docker/pulls/morsalin1342/apache.svg?style=for-the-badge&logo=docker)](https://hub.docker.com/r/morsalin1342/apache)
+[![GitHub Stars](https://img.shields.io/github/stars/morsalin1342/apache-docker?style=for-the-badge&logo=github)](https://github.com/morsalin1342/apache-docker)
+[![License](https://img.shields.io/github/license/morsalin1342/apache-docker?style=for-the-badge)](https://github.com/morsalin1342/apache-docker/blob/main/LICENSE)
+
+The official Apache httpd image (`httpd`), configured. **Static files by default; PHP over FastCGI with one line.**
+There is no PHP in this image — it talks to [`morsalin1342/php`](https://hub.docker.com/r/morsalin1342/php)
+running php-fpm in its own container.
+
+```bash
+docker pull morsalin1342/apache:latest
+```
+
+**Platform:** linux/amd64 only. `morsalin1342/apache` on Docker Hub and `ghcr.io/morsalin1342/apache` on GitHub Container Registry are the same image, pushed by the same build with the same digest; pull whichever you prefer.
+
+## Which tag
+
+Two images, one Dockerfile, the same download: about 46 MB compressed, as Docker Hub reports
+it for the published tags. Pick by **where Apache sits**:
+
+```yaml
+image: morsalin1342/apache:2.4.71           # Apache faces clients
+image: morsalin1342/apache:2.4.71-origin    # a reverse proxy / CDN / load balancer faces clients
+```
+
+| | main server | `-origin` |
+|---|---|---|
+| TLS, HTTP/2, brotli, rate limiting, ACME | ✅ | ❌ — whatever is in front already does it |
+| Static, PHP over FastCGI, `ProxyPass`, rewrite, gzip | ✅ | ✅ |
+| Modules loaded (`httpd -M`) | 49 | 36 |
+| Idle memory (`docker stats`) | about 13 MiB | **about 7 MiB** |
+
+The names come from edge/origin terminology: the *origin* is the server behind the thing facing
+the internet. The split exists because nearly twice the idle memory, paid by every container, is
+not a rounding error — and an origin will never negotiate TLS or HTTP/2 however long it runs.
+
+Switching later needs no new image. On `-origin`,
+`a2enmod ssl http2 brotli ratelimit md proxy_wstunnel proxy_uwsgi proxy_balancer lbmethod_byrequests vhost_alias macro`
+is exactly the difference: those eleven, plus `watchdog` and `slotmem_shm`, which `a2enmod` pulls
+in for `md` and `proxy_balancer`.
+
+`httpd -M` counts `core`, `so` and `http`, which are compiled in; the `LoadModule` lines are three
+fewer, 46 and 33.
+
+## Why this image
+
+Not modules. The official `httpd` image already **ships 130 of them** — rewrite, proxy_fcgi,
+remoteip, brotli, http2 — it just does not *load* them. `httpd -M` on the stock image lists
+no rewrite and no proxy_fcgi, which makes it, in effect, a static file server you have to
+finish assembling.
+
+So this image is the official Apache with the modules an application server needs turned on,
+a base configuration that expects php-fpm next door, and a build that starts the server and
+serves a request before publishing. Saying that plainly is better than inventing a
+compilation story: **nothing here is compiled, and Apache is never rebuilt.**
+
+| | Official `httpd` | This image |
+|---|---|---|
+| Modules loaded (`httpd -M`) | 25 | **36** on `-origin`, 49 on the main-server tag — see MODULES.md in the GitHub repo |
+| `mod_rewrite` | ❌ not loaded | ✅ |
+| PHP over FastCGI | ❌ | ✅ one `Include` line |
+| Real client IP behind a proxy | ❌ | ✅ `remoteip` loaded; trusts the proxy you name, none by default |
+| `.php` when PHP is off | served **as source** | ✅ refused |
+| Document root | `/usr/local/apache2/htdocs` | `/var/www/html`, matching the php image |
+| Startup proven at build | ❌ | ✅ starts and serves before publish |
+| gzip compression | ❌ module present, unloaded | ✅ loaded **and** configured by type |
+| `a2enmod` / `a2enconf` | ❌ Debian-only tools | ✅ shipped, with rollback on `httpd -t` failure |
+
+## Static, by default
+
+```bash
+docker run -d -p 8080:80 -v "$PWD/site:/var/www/html" morsalin1342/apache
+```
+
+`.php` files are **refused with 403**, not served. That is the point: an image with no PHP
+that hands back `config.php` as text is a credential-disclosure bug, and it is the default
+behaviour of every Apache that has no PHP handler. Measured before the rule existed — a stock
+container returned the file contents with a 200.
+
+## PHP, with one line
+
+```yaml
+services:
+  php:
+    image: morsalin1342/php:8.4-fpm
+    volumes: ["./src:/var/www/html"]
+
+  apache:
+    image: morsalin1342/apache
+    depends_on: [php]
+    volumes: ["./src:/var/www/html"]
+    command: sh -c "a2enconf php-fpm && httpd-foreground"
+    ports: ["8080:80"]
+```
+
+…and the container command turns PHP on:
+
+```yaml
+    command: sh -c "a2enconf php-fpm && httpd-foreground"
+```
+
+**Both containers must mount the application at the same path.** Apache maps a URL to a file
+path and hands that path to php-fpm, which opens it itself — a mismatch produces
+`Primary script unknown`, php-fpm looking for a file that exists only in the other container.
+
+## Behind a reverse proxy: the client's address
+
+By default **no proxy is trusted**, on either tag. `REMOTE_ADDR`, `%a` in the access log and
+what PHP sees are the address that connected, and an `X-Forwarded-For` header a client sends
+changes nothing.
+
+To take the client's address from your proxy's header, add a file to
+`/usr/local/apache2/conf/trusted-proxies.d/` that names the proxy:
+
+```apache
+# trusted-proxies.conf
+RemoteIPHeader X-Forwarded-For
+RemoteIPTrustedProxy 172.18.0.2
+```
+
+```bash
+docker run -d \
+    -v "$PWD/trusted-proxies.conf:/usr/local/apache2/conf/trusted-proxies.d/trusted-proxies.conf:ro" \
+    morsalin1342/apache:2.4.71-origin
+```
+
+Apache then replaces the client address with the header's value only on requests that come from
+a listed address. The directory ships `trusted-proxies.conf.example` to start from.
+
+**The risk is in what you list.** Anything that can reach Apache from a listed address can set
+the header to any value it likes, so list your proxy's own address, or the smallest subnet that
+holds it. A wide range such as `172.16.0.0/12` trusts every container on every Docker network,
+not just the proxy. Keep both lines: `RemoteIPHeader` without `RemoteIPTrustedProxy` (or
+`RemoteIPInternalProxy`) believes the header from every client. `RemoteIPTrustedProxy` also
+ignores private addresses in the header; if your clients are on a private network, use
+`RemoteIPInternalProxy` for the proxy instead. A CDN that sends the client in a header of its
+own is the same two lines with that header and the CDN's published address ranges.
+
+## .htaccess
+
+Off by default. `app-server.conf` sets `AllowOverride None`, so Apache ignores `.htaccess`
+files, rewrite rules in them included. To read them in the document root:
+
+```yaml
+    command: sh -c "a2enconf htaccess && httpd-foreground"
+```
+
+(`a2enconf php-fpm htaccess` for both.) That includes `conf/extra/htaccess.conf`, which allows
+`AuthConfig`, `FileInfo`, `Indexes` and `Limit`, and the `FollowSymLinks`,
+`SymLinksIfOwnerMatch`, `MultiViews` and `Indexes` options: what application `.htaccess` files
+use, without letting one turn on CGI or server-side includes.
+
+What it costs: Apache then looks for `.htaccess` in every directory on every request's path, and
+anything that can write into the document root can change how requests there are handled.
+Putting the rules in your own configuration avoids both.
+
+## What is deliberately absent
+
+**PHP.** See above. `docker-php-ext-install`, Composer, WP-CLI and Node live in the php image,
+and a deploy hook that runs `composer install` runs there.
+
+**ModSecurity, or any WAF.** A WAF belongs where requests enter. This image is built to sit
+behind a reverse proxy, and a second WAF behind the first inspects the same bytes for the same
+verdict. If Apache is your outermost server, put one in front of it.
+
+**TLS, HTTP/2, compression, rate limiting, caching.** All shipped, all off. The gateway
+negotiates protocol and encoding with the client; re-compressing between two containers on one
+host spends CPU to save nothing. Caching is [Souin](https://github.com/darkweak/souin)
+standalone in front, so there is one cache with one TTL and one purge mechanism rather than
+two.
+
+Every one of these is one uncommented `LoadModule` away if this image is your edge —
+MODULES.md in the GitHub repo says which and why.
+
+## a2enmod, a2dismod, a2enconf, a2disconf
+
+These are **Debian's** commands and the official `httpd` image is Apache built from source, so
+it has none of them — verified: `command -v a2enmod` finds nothing in the base, while
+Debian's `php:apache` image has it at `/usr/sbin/a2enmod`. This image ships all four,
+reimplemented against the upstream layout.
+
+```bash
+a2enmod --list             # every module in the image and whether it is enabled
+a2enmod deflate http2      # uncomment the LoadModule lines httpd.conf already carries
+a2dismod autoindex         # comment one back out (this image already does this one)
+a2enconf php-fpm           # append an Include for conf/extra/php-fpm.conf
+a2disconf php-fpm          # and remove it
+```
+
+**They do two things Debian's do not.**
+
+*They test the configuration and roll back.* `a2dismod proxy` while `mod_proxy_fcgi` is enabled
+exits 1 and leaves `httpd.conf` untouched, where the Debian original would write the change and
+let Apache fail to start on the next reload.
+
+*They resolve prerequisites both ways.* 16 of the 130 modules fail or come up silently broken
+when enabled alone — and for several of them the config test passes and the breakage only shows
+at runtime, so `httpd -t` cannot save you. `a2enmod ssl` pulls in `socache_shmcb`; `a2dismod
+slotmem_shm` refuses while `proxy_balancer` is loaded. See MODULES.md.
+
+## Configuration
+
+| Path | What |
+|---|---|
+| `conf/extra/app-server.conf` | The base: document root, `.php` refusal, `remoteip`, hardening. Included. |
+| `conf/extra/php-fpm.conf` | The FastCGI handler. Shipped, **included by nothing**; `a2enconf php-fpm`. |
+| `conf/extra/htaccess.conf` | `.htaccess` support. Shipped, **included by nothing**; `a2enconf htaccess`. |
+| `conf/trusted-proxies.d/*.conf` | The reverse proxy whose `X-Forwarded-For` Apache believes. Empty apart from an example. |
+
+All are plain files — mount over any of them. `php-fpm.conf`, `htaccess.conf` and the
+trusted-proxy example are syntax-checked at build in a throwaway copy of `httpd.conf`, because a shipped file that nothing parses is one that can be
+broken for a whole release with every build still green.
+
+## Tags
+
+| Tag | Role |
+|---|---|
+| `morsalin1342/apache:2.4.71` | Apache is the main server |
+| `morsalin1342/apache:latest` | same, floating |
+| `morsalin1342/apache:2.4.71-origin` | Apache is behind a reverse proxy |
+| `morsalin1342/apache:origin` | same, floating |
+
+The version tracks upstream httpd; a new patch release is a one-line bump. The unsuffixed tags
+are deliberately the main-server image — someone typing `apache:latest` without reading this
+should get the one that works when Apache is what clients reach.
+
+## Licence
+
+The repository's build files, configuration and `a2enmod`-family scripts are MIT. Apache httpd
+(Apache-2.0) and the Debian packages in the image keep their own licences; the
+[Licence section](https://github.com/morsalin1342/apache-docker#licence) says more.
+
+---
+
+### 🔗 Related Images & Tools
+
+<!-- BEGIN GENERATED: related (from catalog.yaml in the morsalin1342/docker-images repository; do not edit by hand) -->
+| Image / Tool | Description |
+|--------------|-------------|
+| [morsalin1342/caddy](https://hub.docker.com/r/morsalin1342/caddy) | Standalone Caddy with WAF, rate limiting & caching |
+| [morsalin1342/frankenphp](https://hub.docker.com/r/morsalin1342/frankenphp) | Caddy + PHP app server in one container |
+| [morsalin1342/php](https://hub.docker.com/r/morsalin1342/php) | Traditional PHP-FPM & CLI images |
+| [morsalin1342/nginx](https://hub.docker.com/r/morsalin1342/nginx) | nginx with ModSecurity 3, Brotli, zstd & GeoIP2 |
+| [morsalin1342/adminer](https://hub.docker.com/r/morsalin1342/adminer) | Adminer database tool: the official image plus Alpine security updates |
+| [ghcr.io/morsalin1342/apache](https://github.com/morsalin1342/apache-docker/pkgs/container/apache) | Same image, GitHub Container Registry |
+<!-- END GENERATED: related -->

@@ -1,0 +1,250 @@
+name: Docker Publish
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      # A waiver changes what the scan lets through, so it runs the scan again.
+      - '.trivyignore'
+      - 'conf/**'
+      # scripts/ is baked into the image — a2enmod and the shared dependency
+      # table ship in it, so a change here changes the artifact and must
+      # rebuild. Leaving it out is a silent no-op release.
+      - 'scripts/**'
+      - 'README.md'
+      - 'README.dockerhub.md'
+      - 'LICENSE'
+  # A pull request builds and scans both images. It never logs in and never pushes.
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.trivyignore'
+      - 'conf/**'
+      - 'scripts/**'
+      - '.github/workflows/docker-publish.yml'
+  # Weekly rebuild, so Debian security updates and a moved base image reach the
+  # published tags without waiting for a commit. It writes the same tags as a push.
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run at a time per branch. A second push waits for the first to finish
+# rather than cancelling it, so a half-pushed set of tags is never left behind.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build_and_publish:
+    runs-on: ubuntu-latest
+    if: github.repository == 'morsalin1342/apache-docker'
+    # packages: write lets the job push to ghcr.io/morsalin1342 with GITHUB_TOKEN.
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Extract httpd version from Dockerfile
+        id: get_version
+        run: |
+          # The version lives in an ARG, not a FROM line: the image is
+          # `FROM httpd:${HTTPD_VERSION}`, so grepping FROM would return the
+          # literal placeholder rather than a version.
+          VERSION=$(grep -oP '^ARG HTTPD_VERSION=\K[0-9]+\.[0-9]+\.[0-9]+' Dockerfile | head -n 1)
+          if [ -z "$VERSION" ]; then
+            echo "Could not extract version from Dockerfile."
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # Both targets are built into the runner's Docker daemon only. Nothing
+      # leaves the runner until both scans below have passed.
+      #
+      # The main-server image: Apache facing clients. Default target, so the
+      # unsuffixed tags are the ones most people will pull.
+      - name: Build locally (main server)
+        id: build_server
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: server
+          load: true
+          push: false
+          # Scheduled and manual runs are the security rebuilds: skip the build cache
+          # so the OS package upgrade really runs again, and pull the base image again.
+          no-cache: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+          pull: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+          tags: local/apache:server
+          # Enable GHA caching for faster builds.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # The origin image: Apache behind a reverse proxy that terminates TLS.
+      #
+      # A second build rather than a second Dockerfile — `server` is built FROM
+      # `origin`, so every layer here is already in the cache from the step
+      # above and this costs one config edit and one startup check.
+      - name: Build locally (origin)
+        id: build_origin
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: origin
+          load: true
+          push: false
+          tags: local/apache:origin
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # A fixable critical or high vulnerability in either image fails the run
+      # before anything is pushed. A finding with no fixed version cannot be fixed
+      # by a rebuild, so it does not fail the run. A waiver goes in .trivyignore,
+      # with a reason and an expiry date; the file says how.
+      - name: Scan the main-server image for fixable critical and high vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: local/apache:server
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          exit-code: '1'
+
+      - name: Scan the origin image for fixable critical and high vulnerabilities
+        if: ${{ !cancelled() && steps.build_origin.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: local/apache:origin
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          exit-code: '1'
+
+      - name: Write the SBOM
+        if: ${{ !cancelled() && steps.build_server.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: local/apache:server
+          format: spdx-json
+          output: sbom.spdx.json
+          exit-code: '0'
+
+      - name: Keep the SBOM
+        if: ${{ !cancelled() && steps.build_server.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom-apache-server-${{ steps.get_version.outputs.version }}
+          path: sbom.spdx.json
+
+      - name: Write the origin SBOM
+        if: ${{ !cancelled() && steps.build_origin.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: local/apache:origin
+          format: spdx-json
+          output: sbom-origin.spdx.json
+          exit-code: '0'
+
+      - name: Keep the origin SBOM
+        if: ${{ !cancelled() && steps.build_origin.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom-apache-origin-${{ steps.get_version.outputs.version }}
+          path: sbom-origin.spdx.json
+
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Same context and inputs as the local builds on the same builder, so every
+      # layer comes from their cache: what is pushed is what was scanned. One build
+      # per target writes every tag, so Docker Hub and GHCR get the same digest.
+      - name: Push the scanned main-server image
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: server
+          push: true
+          tags: |
+            morsalin1342/apache:${{ steps.get_version.outputs.version }}
+            morsalin1342/apache:latest
+            ghcr.io/morsalin1342/apache:${{ steps.get_version.outputs.version }}
+            ghcr.io/morsalin1342/apache:latest
+          cache-from: type=gha
+
+      # There is deliberately no `-origin` floating alongside `latest`: the
+      # unsuffixed tags mean "main server", and someone typing `apache:latest`
+      # should get the image that works when Apache is the thing clients reach.
+      - name: Push the scanned origin image
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: origin
+          push: true
+          tags: |
+            morsalin1342/apache:${{ steps.get_version.outputs.version }}-origin
+            morsalin1342/apache:origin
+            ghcr.io/morsalin1342/apache:${{ steps.get_version.outputs.version }}-origin
+            ghcr.io/morsalin1342/apache:origin
+          cache-from: type=gha
+
+      - name: Check the pushed layers are the scanned layers
+        if: github.event_name != 'pull_request'
+        env:
+          VERSION: ${{ steps.get_version.outputs.version }}
+        run: |
+          status=0
+          for pair in "server:ghcr.io/morsalin1342/apache:${VERSION}" "origin:ghcr.io/morsalin1342/apache:${VERSION}-origin"; do
+            local_tag="local/apache:${pair%%:*}"
+            pushed_ref="${pair#*:}"
+            scanned=$(docker image inspect "$local_tag" --format '{{json .RootFS.Layers}}' | jq -c .)
+            pushed=$(docker buildx imagetools inspect "$pushed_ref" --format '{{json .Image.RootFS.DiffIDs}}' | jq -c .)
+            if [ "$scanned" != "$pushed" ]; then
+              echo "::error::${pushed_ref}: the pushed layers differ from the scanned ${local_tag} layers."
+              status=1
+            fi
+          done
+          exit "$status"
+
+  update_readme:
+    # This job runs only after build_and_publish has succeeded, and never for a pull request.
+    needs: build_and_publish
+    runs-on: ubuntu-latest
+    if: github.repository == 'morsalin1342/apache-docker' && github.event_name != 'pull_request'
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Update Docker Hub description (personal repo)
+        uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+          repository: morsalin1342/apache
+          readme-filepath: ./README.dockerhub.md
+          short-description: 'Apache httpd as a static server or php-fpm application server — no PHP inside'

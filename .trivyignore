@@ -1,0 +1,13 @@
+# Waivers for the Trivy gate in .github/workflows/docker-publish.yml.
+#
+# The gate fails on any CRITICAL or HIGH vulnerability that has a fixed
+# version. A finding listed here does not fail it. There are no waivers today.
+#
+# Each waiver is three things: the ID, the reason, and an expiry date. Put the
+# reason on a comment line directly above the ID, and the expiry on the ID's
+# line as `exp:YYYY-MM-DD`. Trivy stops honouring the line after that date, so
+# the waiver has to be looked at again rather than living for ever:
+#
+#   # libexample: fixed only in Debian unstable so far; Apache never calls the
+#   # affected function. Remove when the trixie update lands.
+#   CVE-0000-00000 exp:2026-12-31

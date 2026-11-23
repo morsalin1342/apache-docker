@@ -1,0 +1,87 @@
+#!/bin/sh
+# a2enconf — enable one or more configuration fragments from conf/extra.
+#
+# # Why this is the interesting one
+#
+# a2enmod has an obvious job. This is the command that turns PHP on:
+#
+#     a2enconf php-fpm
+#
+# which is the whole of "make this image a PHP application server". The
+# alternative is telling people to append an Include line to httpd.conf, which
+# works and which nobody remembers the path for.
+#
+# # How it differs from Debian's
+#
+# Debian's a2enconf symlinks conf-available/x.conf into conf-enabled/, which
+# httpd.conf includes with a wildcard. The official httpd image has neither
+# directory and no wildcard include, so this appends an explicit `Include` line
+# to httpd.conf instead — and a2disconf removes it again.
+#
+# The effect is the same and the mechanism is visible in httpd.conf, which for
+# an image with two configuration files is easier to reason about than a
+# symlink farm.
+#
+# Like a2enmod, this tests the configuration and rolls back rather than leaving
+# a container that cannot start.
+
+set -eu
+
+CONF="${HTTPD_CONF:-/usr/local/apache2/conf/httpd.conf}"
+EXTRA="${HTTPD_EXTRA:-/usr/local/apache2/conf/extra}"
+
+if [ $# -eq 0 ]; then
+    echo "usage: a2enconf CONF [CONF...]" >&2
+    echo "       names are without the .conf suffix, e.g. 'a2enconf php-fpm'" >&2
+    echo "       available:" >&2
+    for f in "$EXTRA"/*.conf; do
+        [ -f "$f" ] || continue
+        b="$(basename "$f" .conf)"
+        echo "         $b" >&2
+    done
+    exit 2
+fi
+
+backup="$(mktemp)"
+cp "$CONF" "$backup"
+changed=0
+
+for name in "$@"; do
+    conf="${name%.conf}"
+    file="$EXTRA/${conf}.conf"
+
+    if [ ! -f "$file" ]; then
+        echo "a2enconf: ${conf}.conf is not in $EXTRA" >&2
+        rm -f "$backup"
+        exit 1
+    fi
+
+    # Match the include however it is spelled — an absolute path, or the
+    # conf-relative form Apache's own httpd.conf uses.
+    if grep -qE "^[[:space:]]*Include([[:space:]]+Optional)?[[:space:]]+.*extra/${conf}\.conf" "$CONF"; then
+        echo "a2enconf: ${conf} is already enabled"
+        continue
+    fi
+
+    printf 'Include conf/extra/%s.conf\n' "$conf" >> "$CONF"
+    echo "a2enconf: enabling ${conf}"
+    changed=1
+done
+
+if [ "$changed" -eq 0 ]; then
+    rm -f "$backup"
+    exit 0
+fi
+
+# Capture the complaint before rolling back — afterwards the configuration is
+# valid again and httpd -t will say "Syntax OK", which is not what happened.
+if ! why="$(httpd -t 2>&1)"; then
+    echo "a2enconf: the configuration does not pass httpd -t with that change; rolling back" >&2
+    echo "$why" | grep -v '^Syntax OK$' | sed 's/^/          /' >&2
+    cp "$backup" "$CONF"
+    rm -f "$backup"
+    exit 1
+fi
+
+rm -f "$backup"
+echo "a2enconf: done — restart Apache for it to take effect"

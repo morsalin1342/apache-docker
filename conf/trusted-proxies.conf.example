@@ -1,0 +1,20 @@
+# Trust a reverse proxy's X-Forwarded-For header. **Not loaded:** copy this
+# file to a name ending in .conf in this directory, or mount your own there,
+# for example
+#
+#   -v ./trusted-proxies.conf:/usr/local/apache2/conf/trusted-proxies.d/trusted-proxies.conf:ro
+#
+# By default this image trusts no proxy, and REMOTE_ADDR and the access log
+# show the address that connected.
+#
+# List only your proxy's own address or subnet. Apache replaces the client
+# address with the value of the header when, and only when, the request comes
+# from an address listed here. Anything else that can reach Apache from a listed
+# address can set the header to any value, so a wide range such as 172.16.0.0/12
+# trusts every container on every Docker network, not just the proxy.
+#
+# Keep both directives. RemoteIPHeader on its own, with no RemoteIPTrustedProxy
+# or RemoteIPInternalProxy, believes the header from every client.
+
+RemoteIPHeader X-Forwarded-For
+RemoteIPTrustedProxy 172.18.0.2

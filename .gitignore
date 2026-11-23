@@ -1,0 +1,9 @@
+.idea/
+.vscode/
+.venv
+.ai/
+.claude/
+.gemini/
+.codex/
+.cursor/
+.kimi/

@@ -1,0 +1,19 @@
+# Weekly update pull requests for the actions the workflows use and for the
+# Docker base images. A FROM line built from an ARG (for example
+# `FROM php:${PHP_VERSION}-...`) is not something Dependabot can resolve, so those
+# pins are still moved by hand.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"

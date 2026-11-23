@@ -1,0 +1,30 @@
+name: Docs consistency
+
+# The shared facts of the image repositories (names, namespaces, descriptions)
+# live in catalog.yaml of morsalin1342/docker-images. This job fails when this
+# repository disagrees with that version of the catalog. The action is pinned by
+# commit SHA, so the catalog changes here only through a reviewed pull request
+# (Dependabot opens one for each new release). It runs only in the source
+# repository.
+
+on:
+  pull_request:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  consistency:
+    runs-on: ubuntu-latest
+    if: github.repository == 'morsalin1342/apache-docker'
+    steps:
+      - name: Check out this repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check consistency with the catalog
+        uses: morsalin1342/docker-images@082a0e530ff70a086aac5f94d59cb34eb3082dcc # v1.2.0
