@@ -232,7 +232,7 @@ should get the one that works when Apache is what clients reach.
 
 ## Related Images & Tools
 
-<!-- BEGIN GENERATED: related (from manifest/images.yaml in the morsalin1342/.github repository; do not edit by hand) -->
+<!-- BEGIN GENERATED: related (from catalog.yaml in the morsalin1342/docker-images repository; do not edit by hand) -->
 Every image is published under `morsalin1342` (personal) and `easydigital` (organization), from the same build.
 
 | Repository | Images | Description |

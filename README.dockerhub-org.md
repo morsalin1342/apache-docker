@@ -238,7 +238,7 @@ The repository's build files, configuration and `a2enmod`-family scripts are MIT
 
 ### 🔗 Related Images & Tools
 
-<!-- BEGIN GENERATED: related (from manifest/images.yaml in the morsalin1342/.github repository; do not edit by hand) -->
+<!-- BEGIN GENERATED: related (from catalog.yaml in the morsalin1342/docker-images repository; do not edit by hand) -->
 | Image / Tool | Description |
 |--------------|-------------|
 | [easydigital/caddy](https://hub.docker.com/r/easydigital/caddy) | Standalone Caddy with WAF, rate limiting & caching |

@@ -1,8 +1,10 @@
 name: Docs consistency
 
-# The shared facts of the sibling repositories (names, namespaces, descriptions)
-# live in manifest/images.yaml of the personal .github repository (morsalin1342/.github). This job
-# fails when this repository disagrees with it. It runs only in the source
+# The shared facts of the image repositories (names, namespaces, descriptions)
+# live in catalog.yaml of morsalin1342/docker-images. This job fails when this
+# repository disagrees with that version of the catalog. The action is pinned by
+# commit SHA, so the catalog changes here only through a reviewed pull request
+# (Dependabot opens one for each new release). It runs only in the source
 # repository.
 
 on:
@@ -21,22 +23,8 @@ jobs:
     steps:
       - name: Check out this repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      # TODO: pin ref to a commit SHA once the manifest is published, so a change
-      # to the manifest cannot change what this job runs without a reviewed bump.
-      - name: Check out the shared manifest
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: morsalin1342/.github
-          ref: main
-          path: .shared
+          persist-credentials: false
 
-      - name: Install the YAML parser
-        run: python3 -m pip install --quiet pyyaml
-
-      - name: Check consistency with the manifest
-        run: >-
-          python3 .shared/manifest/sync_docs.py
-          --manifest .shared/manifest/images.yaml
-          --repo "${{ github.event.repository.name }}"
-          --dir . --check
+      - name: Check consistency with the catalog
+        uses: morsalin1342/docker-images@282e6c0fd6f8d1c3a93cba9a39fbd653e771a09e # v1.0.0
