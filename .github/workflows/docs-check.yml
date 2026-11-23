@@ -27,4 +27,4 @@ jobs:
           persist-credentials: false
 
       - name: Check consistency with the catalog
-        uses: morsalin1342/docker-images@282e6c0fd6f8d1c3a93cba9a39fbd653e771a09e # v1.0.0
+        uses: morsalin1342/docker-images@c9b413ccaf51dfb6a070ff68a0d8817cc11aaf4e # v1.1.0
